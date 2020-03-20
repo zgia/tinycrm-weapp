@@ -1,0 +1,129 @@
+<template>
+  <div class="container">
+    <view>
+      <van-button type="primary"
+                  size="small"
+                  icon="add-o"
+                  bind:click="onAddContract"
+                  block>添加签约记录</van-button>
+    </view>
+
+    <block v-for="contract in contracts"
+           :key="contract.contractid">
+      <van-cell-group title="{{ contract.signed_day }} 签约 {{ contract.insurance_title }}">
+        <van-cell center
+                  title="产品"
+                  value="{{ contract.insurance_title }}" />
+        <van-cell center
+                  title="签约时间"
+                  value="{{ contract.signed_day }}" />
+        <van-cell center
+                  title="保额"
+                  value="{{ contract.insured_amount }}" />
+        <van-cell center
+                  title="保费"
+                  value="{{ contract.premium }}" />
+        <van-cell center
+                  title="投保人"
+                  value="{{ contract.policy_holder }}" />
+        <van-cell center
+                  title="被保人"
+                  value="{{ contract.recognizee }}" />
+
+        <van-cell center
+                  is-link
+                  link-type="navigateTo"
+                  url="/pages/members/editcontract?memberid={{ memberid }}&contractid={{ contract.contractid }}"
+                  title="修改签约信息"
+                  title-class="edit-cell" />
+      </van-cell-group>
+    </block>
+  </div>
+</template>
+
+<script>
+import wepy from '@wepy/core'
+import api from '@/api/index'
+
+wepy.page({
+  components: {},
+
+  props: {},
+
+  data() {
+    return {
+      memberid: 0,
+      member: {},
+      contracts: {}
+    }
+  },
+
+  methods: {
+    getContracts(memberid) {
+      api
+        .get('api/contract/index/' + memberid, {})
+        .then(res => {
+          this.contracts = res.data.contracts
+          this.$app.$options.globalData.contracts = this.contracts
+
+          this.member = this.$app.$options.globalData.member
+
+          wx.setNavigationBarTitle({ title: this.member.membername + '的签约记录' })
+        })
+        .catch(error => {
+          console.error('getContracts', error)
+        })
+    },
+
+    onAddContract() {
+      wx.navigateTo({
+        url: `/pages/members/editcontract?memberid=${this.memberid}`
+      })
+    }
+  },
+
+  created() { },
+
+  onShow() {
+    // 编辑签约信息后返回
+    let gd = this.$app.$options.globalData
+    if (gd.lastAction.contract) {
+      this.contracts = gd.contracts
+
+      delete gd.lastAction.contract
+    }
+  },
+
+  onLoad(options) {
+    this.memberid = parseInt(options.memberid)
+    if (isNaN(this.memberid)) {
+      this.memberid = 0
+    }
+    this.getContracts(this.memberid)
+  },
+
+  onPullDownRefresh() {
+    this.getContracts(this.memberid)
+
+    setTimeout(() => {
+      wx.stopPullDownRefresh()
+    }, 1000)
+  }
+})
+</script>
+
+<config>
+{
+    navigationBarTitleText: '客户签约记录',
+    enablePullDownRefresh: true,
+    usingComponents: {
+      'van-button': '~@/components/vant/button/index',
+      'van-cell': '~@/components/vant/cell/index',
+      'van-cell-group': '~@/components/vant/cell-group/index',
+      'van-icon': '~@/components/vant/icon/index'
+    }
+}
+</config>
+
+<style>
+</style>

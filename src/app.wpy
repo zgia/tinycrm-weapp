@@ -1,0 +1,141 @@
+<style lang="less">
+.container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  // align-items: center;
+  justify-content: space-between;
+  box-sizing: border-box;
+}
+.center-view {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+.edit-cell {
+  color: dodgerblue;
+}
+.van-cell__value {
+  color: #707070 !important;
+}
+</style>
+
+<script>
+import wepy from '@wepy/core'
+import eventHub from './common/eventHub'
+import vuex from '@wepy/x'
+import api from '@/api/index'
+
+// 少些几个字符，哈哈
+wx.t_t = (title) => {
+  wx.showToast({title: title, icon: 'none'})
+}
+
+wepy.use(vuex)
+
+wepy.app({
+  hooks: {
+    // App 级别 hook，对整个 App 生效
+    // 同时存在 Page hook 和 App hook 时，优先执行 Page hook，返回值再交由 App hook 处
+    'before-setData': function (dirty) {
+      console.log('setData dirty: ', dirty)
+      return dirty
+    }
+  },
+  globalData: {
+    userInfo: null,
+    member: {},
+    families: {},
+    memberStatusList: {},
+    lastAction: {},
+    searchQuery: null
+  },
+
+  onLaunch() {
+    // wx.setBackgroundFetchToken({
+    //   token: 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE1ODQ0Mzg1NjMsImp0aSI6IkFsZGRVVFwvZThlb252c1hnN0YydWlsZ1h5ZXdHQWRnbGNDTGNxWlF3Q01jPSIsImlzcyI6Im5lbyIsIm5iZiI6MTU4NDQzODU2MywiZXhwIjoxNTg0OTU2OTYzLCJ1aWQiOiIxIiwidW5tIjoiemdpYSJ9.K64MxLLkbz8xVJdL-JCR85pBO8zTL1MCQqGqs8EdcysPDWr9y2QxzzuqUdREmy0LAM6JRgXTitUbFAf-_yNZZg'
+    // })
+    this.auth()
+    this.getStatusList()
+
+    eventHub.$on('app-launch', (...args) => {
+      console.log('app-launch event emitted, the params are:')
+      console.log(args)
+    })
+  },
+
+  methods: {
+    getStatusList() {
+      api
+        .get('api/member/statuslist', {})
+        .then(res => {
+          this.$options.globalData.memberStatusList = res.data
+        })
+        .catch(error => {
+          console.error('getStatusList', error)
+        })
+    },
+
+    auth() {
+      api
+        .get('api/auth', {})
+        .then(res => {
+          console.log('auth', res)
+        })
+        .catch(error => {
+          console.error('auth', error)
+        })
+    }
+  }
+})
+</script>
+<config>
+{
+    pages: [
+      'pages/index',
+      'pages/members/index',
+      'pages/me/index',
+      'pages/members/member',
+      'pages/members/family',
+      'pages/members/editmember',
+      'pages/members/editfamily',
+      'pages/members/interview',
+      'pages/members/editinterview',
+      'pages/members/contract',
+      'pages/members/editcontract'
+    ],
+    window: {
+      backgroundTextStyle: 'light',
+      navigationBarBackgroundColor: '#fff',
+      navigationBarTitleText: 'WeChat',
+      navigationBarTextStyle: 'black'
+    },
+    tabBar: {
+        color: '#B2B2B2',
+        selectedColor: '#409EFF',
+        borderStyle: 'black',
+        // backgroundColor: 'white',
+        list: [
+          {
+            pagePath: 'pages/index',
+            text: '首页',
+            iconPath: 'static/tabs/home.png',
+            selectedIconPath: 'static/tabs/home-active.png'
+          },
+          {
+            pagePath: 'pages/members/index',
+            text: '客户',
+            iconPath: 'static/tabs/members.png',
+            selectedIconPath: 'static/tabs/members-active.png'
+          },
+          {
+            pagePath: 'pages/me/index',
+            text: '我的',
+            iconPath: 'static/tabs/me.png',
+            selectedIconPath: 'static/tabs/me-active.png'
+          }
+        ]
+    }
+}
+</config>

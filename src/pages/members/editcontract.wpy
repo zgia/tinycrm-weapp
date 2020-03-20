@@ -1,0 +1,230 @@
+<template>
+  <div class="container">
+    <view>
+      <van-button type="primary"
+                  size="small"
+                  icon="upgrade"
+                  bind:click="onUpdateContract"
+                  block>保存客户签约记录</van-button>
+    </view>
+
+    <van-cell-group title="签约记录">
+      <van-field value="{{ contract.insurance_title }}"
+                 clearable
+                 label="产品"
+                 placeholder="购买的保险产品"
+                 id="insurance_title"
+                 bind:input="onInputContractInfo" />
+
+      <van-cell is-link
+                title="签约时间"
+                value="{{ signedday }}"
+                bind:click="onShowPopup('signedday')" />
+      <van-popup show="{{ signedday_popup }}"
+                 position="bottom">
+        <van-datetime-picker type="date"
+                             title="签约时间"
+                             value="{{ current_signedday }}"
+                             bind:confirm="onConfirmSignedday"
+                             bind:cancel="onClosePopup" />
+      </van-popup>
+
+      <van-field value="{{ contract.insured_amount }}"
+                 clearable
+                 label="保额(元)"
+                 placeholder="比如：3000000"
+                 id="insured_amount"
+                 bind:input="onInputContractInfo" />
+      <van-field value="{{ contract.premium }}"
+                 clearable
+                 label="保费(元)"
+                 placeholder="比如：3000"
+                 id="premium"
+                 bind:input="onInputContractInfo" />
+      <van-field value="{{ contract.policy_holder }}"
+                 clearable
+                 label="投保人"
+                 placeholder="比如：张三"
+                 id="policy_holder"
+                 bind:input="onInputContractInfo" />
+      <van-field value="{{ contract.recognizee }}"
+                 clearable
+                 label="被保人"
+                 placeholder="比如：李四"
+                 id="recognizee"
+                 bind:input="onInputContractInfo" />
+
+    </van-cell-group>
+
+    <van-toast id="van-toast" />
+  </div>
+</template>
+
+<script>
+import wepy from '@wepy/core'
+import api from '@/api/index'
+import utils from '@/utils/index'
+import Toast from '@/components/vant/toast/toast'
+
+wepy.page({
+  components: {},
+
+  props: {},
+
+  data: {
+    memberid: 0,
+    contractid: 0,
+    contract: {},
+
+    // 当前操作对象
+    current_key: '',
+
+    signedday: '',
+    signedday_popup: false,
+    current_signedday: 0,
+
+    updateContractBtnclicked: false
+  },
+
+  computed: {
+  },
+
+  methods: {
+    getContract() {
+      if (this.contractid !== 0) {
+        this.contract = this.$app.$options.globalData.contracts[this.contractid]
+        this.signedday = this.contract.signed_day
+      } else {
+        this.contract = {}
+        this.signedday = null
+      }
+      this.current_signedday = utils.getMilliseconds(this.signedday)
+
+      this.member = this.$app.$options.globalData.member
+      wx.setNavigationBarTitle({ title: this.member.membername + '的签约记录' })
+    },
+
+    onUpdateContract() {
+      if (this.updateContractBtnclicked) {
+        Toast('请勿多次点击')
+        return
+      } else {
+        this.updateMemberBtnclicked = true
+        setTimeout(() => {
+          this.updateMemberBtnclicked = false
+        }, 3000)
+      }
+
+      let contract = this.contract
+
+      contract.memberid = this.memberid
+      contract.contractid = this.contractid
+      contract.signed_day = this.signedday
+
+      let data = { contract: contract }
+
+      api
+        .post(`api/contract/update`, data)
+        .then(res => {
+          if (res.code === 0) {
+            Toast({
+              type: 'success',
+              message: res.msg,
+              onClose: () => {
+                contract.contractid = res.data.contractid
+                this.afterContractUpdated(contract)
+              }
+            })
+          } else {
+            Toast.fail(res.msg)
+          }
+        })
+        .catch(error => {
+          const err = `onUpdateContract: ${this.memberid}-${this.contractid}, ${error}`
+          Toast.fail(err)
+        })
+    },
+
+    afterContractUpdated(contract) {
+      // 新增签约记录
+      if (this.contractid === 0) {
+        wx.redirectTo({
+          url: `/pages/members/contract?memberid=${contract.memberid}`
+        })
+      } else {
+        let gd = this.$app.$options.globalData
+        gd.families[contract.contractid] = contract
+
+        gd.lastAction['contract'] = contract.contractid
+
+        wx.navigateBack()
+      }
+    },
+
+    // 保存生日
+    onConfirmSignedday(value) {
+      this.current_signedday = value.$wx.detail
+
+      let day = utils.formatTime(new Date(this.current_signedday))
+      this.signedday = day
+
+      this.onClosePopup()
+    },
+
+    onShowPopup(key) {
+      this.current_key = key
+
+      this[`${key}_popup`] = true
+    },
+
+    onClosePopup() {
+      let key = this.current_key
+      this[`${key}_popup`] = false
+    },
+
+    // 修改客户信息
+    onInputContractInfo(event) {
+      this.contract[event.$wx.currentTarget.id] = event.$wx.detail
+    }
+  },
+
+  created() { },
+
+  onLoad(options) {
+    this.memberid = parseInt(options.memberid)
+    if (isNaN(this.memberid)) {
+      this.memberid = 0
+    }
+
+    this.contractid = parseInt(options.contractid)
+    if (isNaN(this.contractid)) {
+      this.contractid = 0
+    }
+
+    this.getContract()
+  }
+})
+</script>
+
+<config>
+{
+    navigationBarTitleText: '客户签约记录',
+    usingComponents: {
+      'van-toast': '~@/components/vant/toast/index',
+      'van-button': '~@/components/vant/button/index',
+      'van-cell': '~@/components/vant/cell/index',
+      'van-cell-group': '~@/components/vant/cell-group/index',
+      'van-icon': '~@/components/vant/icon/index',
+      'van-field': '~@/components/vant/field/index',
+      'van-popup': '~@/components/vant/popup/index',
+      'van-picker': '~@/components/vant/picker/index',
+      'van-datetime-picker': '~@/components/vant/datetime-picker/index'
+    }
+}
+</config>
+
+<style>
+.value-class {
+  flex: none !important;
+}
+</style>

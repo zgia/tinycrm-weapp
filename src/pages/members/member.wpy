@@ -1,0 +1,216 @@
+<template>
+  <div class="container">
+    <view class="center-view">
+      <van-button type="primary"
+                  size="small"
+                  icon="edit"
+                  custom-class="ml2"
+                  bind:click="onEditMember">修改</van-button>
+      <van-button type="primary"
+                  size="small"
+                  icon="friends-o"
+                  custom-class="ml2"
+                  bind:click="onViewFamily">亲属</van-button>
+      <van-button type="primary"
+                  size="small"
+                  icon="records"
+                  custom-class="ml2"
+                  bind:click="onListInterview">访谈</van-button>
+      <van-button type="primary"
+                  size="small"
+                  icon="sign"
+                  custom-class="ml2"
+                  bind:click="onListContract">签约</van-button>
+    </view>
+    <van-cell-group title="{{ member.membername }}">
+      <van-cell title="客户标签"
+                value="{{ tag_title }}" />
+      <van-cell title="签约状态"
+                value="{{ signed_title }}" />
+      <van-cell title="销售状态"
+                value="{{ saler_title }}" />
+    </van-cell-group>
+    <van-cell-group title="基本信息">
+      <van-cell title="生日"
+                value="{{ member.birthday }}" />
+      <van-cell title="性别"
+                value="{{ gender_title }}" />
+      <van-cell title="婚姻状况"
+                value="{{ marital_title }}" />
+      <van-cell title="身份证"
+                value="{{ member.idcard }}" />
+      <van-cell title="联系方式"
+                value="{{ member.mobile }}"
+                clickable
+                bind:click="onMakePhoneCall(member.mobile)" />
+      <van-cell title="联系方式"
+                value="{{ member.tel }}"
+                clickable
+                bind:click="onMakePhoneCall(member.mobile)" />
+      <van-cell title="年收入"
+                value="{{ member.annual_income }}万元" />
+      <van-cell title="理财习惯"
+                value="{{ member.financing_habit }}" />
+      <van-cell title="性格"
+                value="{{ member.personality }}" />
+      <van-cell title="兴趣爱好"
+                value="{{ member.hobby }}" />
+      <van-cell title="家庭地址"
+                value="{{ member.home_address }}({{ member.home_address_postcode }})" />
+    </van-cell-group>
+    <van-cell-group title="公司信息">
+      <van-cell title="公司"
+                value="{{ member.company }}" />
+      <van-cell title="职位"
+                value="{{ member.company_title }}" />
+      <van-cell title="公司地址"
+                value="{{ member.company_address }}({{ member.company_address_postcode }})" />
+    </van-cell-group>
+    <van-cell-group title="备注">
+      <van-cell use-label-slot>
+        <view slot="label"
+              class="van-cell-label">
+          {{ member.description }}
+        </view>
+      </van-cell>
+    </van-cell-group>
+  </div>
+</template>
+
+<script>
+import wepy from '@wepy/core'
+import api from '@/api/index'
+
+wepy.page({
+  components: {},
+
+  props: {},
+
+  data() {
+    return {
+      memberid: 0,
+      member: {},
+      tag_title: '',
+      gender_title: '',
+      signed_title: '',
+      saler_title: '',
+      marital_title: '',
+      memberStatusList: {}
+    }
+  },
+
+  methods: {
+    getMember(memberid) {
+      let data = {}
+      api
+        .get('api/member/view/' + memberid, data)
+        .then(res => {
+          this.member = res.data.member
+          this.$app.$options.globalData.member = this.member
+
+          this.processMemberData(this.member)
+        })
+        .catch(error => {
+          console.error('getMember', error)
+        })
+    },
+
+    processMemberData(member) {
+      this.tag_title = this.makeTagTitles(member.tags)
+
+      this.signed_title = this.memberStatusList.signedList[member.signed]
+      this.saler_title = this.memberStatusList.salerList[member.saler]
+      this.gender_title = this.memberStatusList.genderList[member.gender]
+      this.marital_title = this.memberStatusList.maritalList[member.marital]
+
+      wx.setNavigationBarTitle({ title: member.membername })
+    },
+
+    makeTagTitles(tagids) {
+      let titles = []
+      for (let idx in tagids) {
+        titles.push(this.memberStatusList.tagList[tagids[idx]])
+      }
+      return titles.join(', ')
+    },
+
+    onMakePhoneCall(phone) {
+      wx.makePhoneCall({
+        phoneNumber: phone,
+        complete: (res) => { console.log(`拨号：${phone}`, res) }
+      })
+    },
+
+    onEditMember() {
+      wx.navigateTo({
+        url: `/pages/members/editmember?memberid=${this.memberid}`
+      })
+    },
+
+    onViewFamily() {
+      wx.navigateTo({
+        url: `/pages/members/family?memberid=${this.memberid}`
+      })
+    },
+
+    onListInterview() {
+      wx.navigateTo({
+        url: `/pages/members/interview?memberid=${this.memberid}`
+      })
+    },
+
+    onListContract() {
+      wx.navigateTo({
+        url: `/pages/members/contract?memberid=${this.memberid}`
+      })
+    }
+  },
+
+  created() {
+    this.memberStatusList = this.$app.$options.globalData.memberStatusList
+  },
+
+  onShow() {
+    // 编辑客户信息后返回
+    let gd = this.$app.$options.globalData
+    if (gd.lastAction.member) {
+      this.member = gd.member
+      this.processMemberData(gd.member)
+
+      delete gd.lastAction.member
+    }
+  },
+
+  onLoad(options) {
+    this.memberid = parseInt(options.memberid)
+    if (isNaN(this.memberid)) {
+      this.memberid = 0
+    }
+
+    this.getMember(this.memberid)
+  }
+})
+</script>
+
+<config>
+{
+    navigationBarTitleText: '我的客户',
+    usingComponents: {
+      'van-button': '~@/components/vant/button/index',
+      'van-cell': '~@/components/vant/cell/index',
+      'van-cell-group': '~@/components/vant/cell-group/index',
+      'van-icon': '~@/components/vant/icon/index'
+    }
+}
+</config>
+
+<style>
+.ml2 {
+  margin-left: 2px;
+  margin-right: 2px;
+}
+.van-cell-label {
+  color: #323233;
+  white-space: pre-wrap;
+}
+</style>

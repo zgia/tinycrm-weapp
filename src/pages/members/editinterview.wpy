@@ -1,0 +1,298 @@
+<template>
+  <div class="container">
+    <view>
+      <van-button type="primary"
+                  size="small"
+                  icon="upgrade"
+                  bind:click="onUpdateInterview"
+                  block>保存客户访谈记录</van-button>
+    </view>
+
+    <van-cell-group title="    ">
+
+      <van-cell is-link
+                title="访谈时间"
+                value="{{ interviewday }}"
+                bind:click="onShowPopup('interviewday')" />
+      <van-popup show="{{ interviewday_popup }}"
+                 position="bottom">
+        <van-datetime-picker type="date"
+                             title="访谈时间"
+                             value="{{ current_interviewday }}"
+                             bind:confirm="onConfirmInterviewday"
+                             bind:cancel="onClosePopup" />
+      </van-popup>
+
+      <van-field value="{{ interview.address }}"
+                 clearable
+                 label="访谈地点"
+                 placeholder="比如：东方银座星巴克"
+                 id="address"
+                 bind:input="onInputInterviewInfo" />
+      <van-field value="{{ interview.content }}"
+                 type="textarea"
+                 autosize
+                 placeholder="请输入访谈内容"
+                 id="content"
+                 bind:input="onInputInterviewInfo" />
+
+    </van-cell-group>
+
+    <view class="upload-files">
+      <van-uploader file-list="{{ fileList }}"
+                    max-size="{{ maxFileSize }}"
+                    sizeType="['original']"
+                    image-fit="cover"
+                    bind:afterread="afterReadImage"
+                    bind:oversize="oversizeImage"
+                    bind:delete="deleteImage" />
+    </view>
+
+    <van-toast id="van-toast" />
+    <van-dialog id="van-dialog" />
+  </div>
+</template>
+
+<script>
+import md5 from 'js-md5'
+import wepy from '@wepy/core'
+import api from '@/api/index'
+import config from '@/api/config'
+import utils from '@/utils/index'
+import Toast from '@/components/vant/toast/toast'
+import Dialog from '@/components/vant/dialog/dialog'
+
+wepy.page({
+  components: {},
+
+  props: {},
+
+  data: {
+    memberid: 0,
+    interviewid: 0,
+    interview: {},
+
+    // Upload 5242880
+    maxFileSize: 1048576,
+    fileList: [],
+    newFileList: [],
+    deletedFileList: [],
+
+    // 当前操作对象
+    current_key: '',
+
+    interviewday: '',
+    interviewday_popup: false,
+    current_interviewday: 0,
+
+    updateInterviewBtnclicked: false
+  },
+
+  computed: {
+  },
+
+  methods: {
+    getInterview() {
+      if (this.interviewid !== 0) {
+        this.interview = this.$app.$options.globalData.interviews[this.interviewid]
+        this.interviewday = this.interview.interviewday
+      } else {
+        this.interview = { files: [] }
+        this.interviewday = null
+      }
+      this.current_interviewday = utils.getMilliseconds(this.interviewday)
+
+      if (this.interview.files.length) {
+        for (let idx in this.interview.files) {
+          this.fileList.push({ url: this.interview.files[idx] })
+        }
+      }
+
+      this.member = this.$app.$options.globalData.member
+      wx.setNavigationBarTitle({ title: this.member.membername + '的访谈记录' })
+    },
+
+    onUpdateInterview() {
+      if (this.updateInterviewBtnclicked) {
+        Toast('请勿多次点击')
+        return
+      } else {
+        this.updateMemberBtnclicked = true
+        setTimeout(() => {
+          this.updateMemberBtnclicked = false
+        }, 3000)
+      }
+
+      let interview = this.interview
+
+      interview.memberid = this.memberid
+      interview.interviewid = this.interviewid
+      interview.interviewday = this.interviewday
+
+      let data = {
+        interview: interview,
+        new_files: this.newFileList,
+        deleted_files: this.deletedFileList
+      }
+
+      api
+        .post(`api/interview/update`, data)
+        .then(res => {
+          if (res.code === 0) {
+            Toast({
+              type: 'success',
+              message: res.msg,
+              onClose: () => {
+                interview.interviewid = res.data.interviewid
+                this.afterInterviewUpdated(interview)
+              }
+            })
+          } else {
+            Toast.fail(res.msg)
+          }
+        })
+        .catch(error => {
+          const err = `onUpdateInterview: ${this.memberid}-${this.interviewid}, ${error}`
+          Toast.fail(err)
+        })
+    },
+
+    beforeReadImage(event) {
+      const { file, callback } = event.$wx.detail
+      callback(file.type === 'image')
+    },
+
+    afterReadImage(event) {
+      let self = this
+
+      // http://www.shangdixinxi.com/detail-1204485.html
+
+      // file = {size: 85101, path: "http://tmp/wx55a97715a3e2ea10.o6zAJsz0TxajvDT_OgA6wuKa_czQ.sez3xqEF3fsS94c7736c3194b5c42cc637cfca8cdcc1.png"}
+      const { file, name } = event.$wx.detail
+      file.name = md5(name + file.path + file.size)
+
+      // 当设置 mutiple 为 true 时, file 为数组格式，否则为对象格式
+      wx.uploadFile({
+        url: config.Host.production + '/upload/' + file.name,
+        filePath: file.path,
+        name: file.name,
+        header: { authorization: 'Bearer ' + config.token },
+        formData: {
+          dir: 'interview',
+          ajax: 1,
+          weapp: 1,
+          name: file.name
+        },
+        success(res) {
+          // 上传完成需要更新 fileList
+          let data = JSON.parse(res.data)
+          if (data.code === 0) {
+            const { fileList = [] } = self
+            fileList.push({ url: data.data.url })
+
+            self.newFileList.push(data.data.url)
+          } else {
+            Toast(data.msg)
+          }
+        },
+        fail(res) {
+          Toast(res.errMsg)
+        }
+      })
+    },
+
+    oversizeImage(event) {
+      wx.t_t('文件超过最大尺寸5M')
+    },
+
+    deleteImage(event) {
+      Dialog.confirm({
+        title: '删除文件',
+        message: '确认要删除这个文件吗？'
+      }).then(() => {
+        let idx = event.$wx.detail.index
+        this.deletedFileList.push(this.fileList[idx].url)
+        this.fileList.splice(idx, 1)
+      }).catch(() => {
+        // on cancel
+      })
+    },
+
+    afterInterviewUpdated(interview) {
+      let gd = this.$app.$options.globalData
+      gd.families[interview.interviewid] = interview
+
+      gd.lastAction['interview'] = interview.interviewid
+
+      wx.navigateBack()
+    },
+
+    // 保存访谈时间
+    onConfirmInterviewday(value) {
+      this.current_interviewday = value.$wx.detail
+
+      let day = utils.formatTime(new Date(this.current_interviewday))
+      this.interviewday = day
+
+      this.onClosePopup()
+    },
+
+    onShowPopup(key) {
+      this.current_key = key
+
+      this[`${key}_popup`] = true
+    },
+
+    onClosePopup() {
+      let key = this.current_key
+      this[`${key}_popup`] = false
+    },
+
+    // 修改客户信息
+    onInputInterviewInfo(event) {
+      this.interview[event.$wx.currentTarget.id] = event.$wx.detail
+    }
+  },
+
+  created() { },
+
+  onLoad(options) {
+    this.memberid = parseInt(options.memberid)
+    if (isNaN(this.memberid)) {
+      this.memberid = 0
+    }
+
+    this.interviewid = parseInt(options.interviewid)
+    if (isNaN(this.interviewid)) {
+      this.interviewid = 0
+    }
+
+    this.getInterview()
+  }
+})
+</script>
+
+<config>
+{
+    navigationBarTitleText: '客户访谈记录',
+    usingComponents: {
+      'van-dialog': '~@/components/vant/dialog/index',
+      'van-uploader': '~@/components/vant/uploader/index',
+      'van-toast': '~@/components/vant/toast/index',
+      'van-button': '~@/components/vant/button/index',
+      'van-cell': '~@/components/vant/cell/index',
+      'van-cell-group': '~@/components/vant/cell-group/index',
+      'van-icon': '~@/components/vant/icon/index',
+      'van-field': '~@/components/vant/field/index',
+      'van-popup': '~@/components/vant/popup/index',
+      'van-picker': '~@/components/vant/picker/index',
+      'van-datetime-picker': '~@/components/vant/datetime-picker/index'
+    }
+}
+</config>
+
+<style>
+.upload-files {
+  padding-top: 20px;
+}
+</style>

@@ -1,0 +1,275 @@
+<template>
+  <div class="container">
+    <view>
+      <van-button type="primary"
+                  size="small"
+                  icon="upgrade"
+                  bind:click="onUpdateFamily"
+                  block>保存客户亲属信息</van-button>
+    </view>
+
+    <van-cell-group title="亲属信息">
+      <van-field value="{{ family.membername }}"
+                 clearable
+                 label="姓名"
+                 placeholder="请输入亲属姓名"
+                 id="membername"
+                 bind:input="onInputFamilyInfo" />
+
+      <van-cell is-link
+                title="生日"
+                value="{{ birthday }}"
+                bind:click="onShowPopup('birthday')" />
+      <van-popup show="{{ birthday_popup }}"
+                 position="bottom">
+        <van-datetime-picker type="date"
+                             title="生日"
+                             value="{{ current_birthday }}"
+                             bind:confirm="onConfirmBirthday"
+                             bind:cancel="onClosePopup" />
+      </van-popup>
+
+      <van-cell is-link
+                title="关系"
+                value="{{ relationship_title }}"
+                bind:click="onShowPopup('relationship')" />
+      <van-popup show="{{ relationship_popup }}"
+                 position="bottom">
+        <van-picker show-toolbar
+                    title="关系"
+                    class="relationship"
+                    columns="{{ relationship_columns }}"
+                    default-index="{{ relationship_index }}"
+                    bind:confirm="onConfirm"
+                    bind:cancel="onClosePopup" />
+      </van-popup>
+
+      <van-field value="{{ family.mobile }}"
+                 clearable
+                 label="联系方式"
+                 placeholder="比如：1390xxxxxxx"
+                 id="mobile"
+                 bind:input="onInputFamilyInfo" />
+
+      <van-field value="{{ family.description }}"
+                 type="textarea"
+                 autosize
+                 clearable
+                 label="备注"
+                 placeholder="请输入其他补充信息"
+                 id="description"
+                 bind:input="onInputFamilyInfo" />
+    </van-cell-group>
+
+    <van-toast id="van-toast" />
+  </div>
+</template>
+
+<script>
+import wepy from '@wepy/core'
+import api from '@/api/index'
+import utils from '@/utils/index'
+import Toast from '@/components/vant/toast/toast'
+
+wepy.page({
+  components: {},
+
+  props: {},
+
+  data: {
+    memberid: 0,
+    familyid: 0,
+    family: {},
+    memberStatusList: {},
+
+    // 当前操作对象
+    current_key: '',
+
+    birthday: '',
+    birthday_popup: false,
+    current_birthday: 0,
+
+    relationship_title: '',
+    relationship_index: 0,
+    relationship_popup: false,
+    relationship_columns: [],
+    relationship_key_index: [],
+
+    updateFamilyBtnclicked: false
+  },
+
+  computed: {
+  },
+
+  methods: {
+    getFamily() {
+      if (this.familyid !== 0) {
+        this.family = this.$app.$options.globalData.families[this.familyid]
+        this.birthday = this.family.birthday
+      } else {
+        this.family = { relationship: 0 }
+        this.birthday = null
+      }
+      this.current_birthday = utils.getMilliseconds(this.birthday)
+
+      this.makeColumnData('relationship')
+
+      this.member = this.$app.$options.globalData.member
+      wx.setNavigationBarTitle({ title: this.member.membername + '的亲属' })
+    },
+
+    makeColumnData(key) {
+      let _list = this.memberStatusList[`${key}List`]
+
+      this[`${key}_columns`] = []
+      this[`${key}_key_index`] = []
+
+      this[`${key}_columns`].push('不确定')
+      this[`${key}_key_index`].push(0)
+      for (let idx in _list) {
+        this[`${key}_columns`].push(_list[idx])
+        this[`${key}_key_index`].push(parseInt(idx))
+      }
+
+      let kidx = parseInt(this.family[key])
+      this[`${key}_index`] = this[`${key}_key_index`].indexOf(kidx)
+      this[`${key}_title`] = _list[kidx]
+    },
+
+    onUpdateFamily() {
+      if (this.updateFamilyBtnclicked) {
+        Toast('请勿多次点击')
+        return
+      } else {
+        this.updateMemberBtnclicked = true
+        setTimeout(() => {
+          this.updateMemberBtnclicked = false
+        }, 3000)
+      }
+
+      let family = this.family
+
+      family.memberid = this.memberid
+      family.familyid = this.familyid
+      family.birthday = this.birthday
+      family.relationship = this.relationship_key_index[this.relationship_index]
+
+      let data = { family: family }
+
+      api
+        .post(`api/member/updatefamily`, data)
+        .then(res => {
+          if (res.code === 0) {
+            Toast({
+              type: 'success',
+              message: res.msg,
+              onClose: () => {
+                family.familyid = res.data.familyid
+                this.afterFamilyUpdated(family)
+              }
+            })
+          } else {
+            Toast.fail(res.msg)
+          }
+        })
+        .catch(error => {
+          const err = `onUpdateFamily: ${this.memberid}-${this.familyid}, ${error}`
+          Toast.fail(err)
+        })
+    },
+
+    afterFamilyUpdated(family) {
+      // 新增亲属
+      if (this.familyid === 0) {
+        wx.redirectTo({
+          url: `/pages/members/family?memberid=${family.memberid}`
+        })
+      } else {
+        let gd = this.$app.$options.globalData
+        gd.families[family.familyid] = family
+
+        gd.lastAction['family'] = family.familyid
+
+        wx.navigateBack()
+      }
+    },
+
+    // 保存生日
+    onConfirmBirthday(value) {
+      this.current_birthday = value.$wx.detail
+
+      let day = utils.formatTime(new Date(this.current_birthday))
+      this.birthday = day
+
+      this.onClosePopup()
+    },
+
+    onShowPopup(key) {
+      this.current_key = key
+
+      this[`${key}_popup`] = true
+    },
+
+    onClosePopup() {
+      let key = this.current_key
+      this[`${key}_popup`] = false
+
+      if (key !== 'birthday') {
+        this.$wx.selectComponent(`.${key}`).setIndexes([this[`${key}_index`]])
+      }
+    },
+
+    onConfirm(value) {
+      let _tmp = value.$wx.detail
+      let key = this.current_key
+      this[`${key}_title`] = _tmp.value
+      this[`${key}_index`] = _tmp.index
+
+      this.onClosePopup()
+    },
+
+    // 修改客户信息
+    onInputFamilyInfo(event) {
+      this.family[event.$wx.currentTarget.id] = event.$wx.detail
+    }
+  },
+
+  created() {
+    this.memberStatusList = this.$app.$options.globalData.memberStatusList
+  },
+
+  onLoad(options) {
+    this.memberid = parseInt(options.memberid)
+    if (isNaN(this.memberid)) {
+      this.memberid = 0
+    }
+
+    this.familyid = parseInt(options.familyid)
+    if (isNaN(this.familyid)) {
+      this.familyid = 0
+    }
+
+    this.getFamily()
+  }
+})
+</script>
+
+<config>
+{
+    navigationBarTitleText: '客户亲属',
+    usingComponents: {
+      'van-toast': '~@/components/vant/toast/index',
+      'van-button': '~@/components/vant/button/index',
+      'van-cell': '~@/components/vant/cell/index',
+      'van-cell-group': '~@/components/vant/cell-group/index',
+      'van-icon': '~@/components/vant/icon/index',
+      'van-field': '~@/components/vant/field/index',
+      'van-popup': '~@/components/vant/popup/index',
+      'van-picker': '~@/components/vant/picker/index',
+      'van-datetime-picker': '~@/components/vant/datetime-picker/index'
+    }
+}
+</config>
+
+<style>
+</style>

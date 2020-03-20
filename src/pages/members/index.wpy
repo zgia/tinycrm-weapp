@@ -1,0 +1,237 @@
+<template>
+  <div class="container">
+    <van-search value="{{ searchQuery }}"
+                placeholder="搜索客户姓名"
+                use-action-slot
+                bind:change="onChangeQuery"
+                bind:search="onSearch">
+      <view slot="action"
+            bind:tap="onAddMember">
+        <van-button size="small"
+                    icon="add-o"
+                    type="primary">新增客户</van-button>
+      </view>
+    </van-search>
+
+    <van-cell-group>
+      <block v-for="member in members"
+             :key="{{ member.memberid }}">
+
+        <van-swipe-cell id="swipe-cell-{{ member.memberid }}"
+                        data-id="{{ member.memberid }}"
+                        right-width="{{ 65 }}"
+                        async-close
+                        bind:close="onCloseSwipe"
+                        bind:open="onOpenSwipe">
+          <van-cell center
+                    class=""
+                    data-id="member.memberid"
+                    title="{{ member.membername }}{{ member.gender === 1 ? '👦' : (member.gender === 2 ? '👱‍♀️' : '👤') }}"
+                    value="{{ member.tags }}"
+                    label="🎂{{ member.birthday }}"
+                    clickable="true"
+                    @click="onViewMember(member.memberid)" />
+          <view slot="right"
+                class="swipe-cell-right">删除</view>
+        </van-swipe-cell>
+
+      </block>
+    </van-cell-group>
+
+    <view v-if="noMoreMember">
+      <van-divider contentPosition="center">客户只有这么多，加油啊</van-divider>
+    </view>
+
+    <van-dialog id="van-dialog" />
+  </div>
+</template>
+
+<script>
+import wepy from '@wepy/core'
+import api from '@/api/index'
+import Dialog from '@/components/vant/dialog/dialog'
+
+wepy.page({
+  components: {},
+
+  props: {},
+
+  data() {
+    return {
+      page: 1,
+      noMoreMember: false,
+      members: [],
+      logs: [],
+      searchQuery: '',
+      deleteAction: false
+    }
+  },
+
+  computed: {
+  },
+
+  methods: {
+    getMemberList() {
+      if (this.$app.$options.globalData.searchQuery) {
+        this.searchQuery = this.$app.$options.globalData.searchQuery
+
+        this.$app.$options.globalData.searchQuery = null
+      }
+
+      let data = { membername: this.searchQuery, p: this.page }
+      api
+        .get('api/member/index', data)
+        .then(res => {
+          this.noMoreMember = res.data.noMoreMember
+
+          if (this.page === 1) {
+            this.members = res.data.members
+          } else {
+            let index = this.members.length
+            let newData = []
+            res.data.members.forEach((item) => {
+              newData['members[' + (index++) + ']'] = item
+            })
+            this.$wx.setData(newData)
+          }
+        })
+        .catch(error => {
+          console.error('getMemberList', error)
+        })
+    },
+
+    onChangeQuery(event) {
+      this.searchQuery = event.$wx.detail
+    },
+
+    onSearch() {
+      this.page = 1
+      this.getMemberList()
+    },
+
+    onViewMember(memberid) {
+      wx.navigateTo({
+        url: `/pages/members/member?memberid=${memberid}`
+      })
+    },
+
+    onAddMember(event) {
+      wx.navigateTo({
+        url: `/pages/members/editmember?memberid=0`
+      })
+    },
+
+    deleteMember(id) {
+      let index = 0
+      for (let idx in this.members) {
+        if (this.members[idx].memberid == id) {
+          index = idx
+          break
+        }
+      }
+
+      if (index) {
+        api
+          .del('api/member/delete/' + this.members[index].memberid)
+          .then(res => {
+            if (res.code === 0) {
+              this.members.splice(index, 1)
+            } else {
+              wx.t_t(res.msg)
+            }
+          })
+          .catch(error => {
+            console.error('deletemember', error)
+          })
+      }
+    },
+
+    onCloseSwipe(event) {
+      this.deleteAction = false
+
+      const { position, instance } = event.$wx.detail
+      switch (position) {
+        case 'left':
+        case 'cell':
+          instance.close()
+          break
+        case 'right':
+          Dialog.confirm({
+            message: '确定删除吗？'
+          }).then(() => {
+            this.deleteMember(event.currentTarget.dataset.id)
+            instance.close()
+          }).catch(() => {
+            // on cancel
+          })
+          break
+      }
+    },
+
+    onOpenSwipe(event) {
+      const { position, name } = event.$wx.detail
+      console.log(`${name}${position}部分展示open事件被触发`)
+
+      this.deleteAction = true
+    }
+  },
+
+  created() {
+  },
+
+  onShow(options) {
+    this.getMemberList()
+  },
+
+  onLoad(options) {
+    this.getMemberList()
+  },
+
+  onPullDownRefresh() {
+    this.getMemberList()
+
+    setTimeout(() => {
+      wx.stopPullDownRefresh()
+    }, 1000)
+  },
+
+  onReachBottom() {
+    if (!this.noMoreMember) {
+      this.page++
+      this.getMemberList()
+    }
+  }
+}
+)
+</script>
+
+<config>
+{
+    navigationBarTitleText: '我的客户',
+    enablePullDownRefresh: true,
+    usingComponents: {
+      'van-dialog': '~@/components/vant/dialog/index',
+      'van-divider': '~@/components/vant/divider/index',
+      'van-button': '~@/components/vant/button/index',
+      'van-search': '~@/components/vant/search/index',
+      'van-swipe-cell': '~@/components/vant/swipe-cell/index',
+      'van-cell': '~@/components/vant/cell/index',
+      'van-cell-group': '~@/components/vant/cell-group/index',
+      'van-icon': '~@/components/vant/icon/index'
+    }
+}
+</config>
+
+<style>
+.swipe-cell-right {
+  color: #fff;
+}
+.van-swipe-cell__left,
+.van-swipe-cell__right {
+  background-color: red;
+  width: 65px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+</style>

@@ -1,0 +1,209 @@
+<template>
+  <div class="container">
+    <van-grid column-num="2">
+      <van-grid-item icon="friends-o"
+                     text="{{ memberCount }}名客户"
+                     bind:click="onListMembers" />
+      <van-grid-item icon="flower-o"
+                     text="{{ interviewCount }}次访谈" />
+    </van-grid>
+
+    <van-panel title="🎂生日提醒({{ today }})"
+               status="今天{{ todayTotal }}人"
+               class="birthday">
+      <view class="center-view">
+        <block v-for="tb in todayBirthday">
+          <van-button custom-class="ml2"
+                      custom-style="border:0"
+                      bind:click="onViewMember(tb.memberid)">
+            {{ tb.membername }}({{ tb.age }}岁)
+          </van-button>
+        </block>
+      </view>
+    </van-panel>
+
+    <f2 class="f2-chart"
+        onInit="{{ onInitChart }}"
+        @touchstart="onTouchStart" />
+  </div>
+</template>
+
+<script>
+import wepy from '@wepy/core'
+import api from '@/api/index'
+
+let _chart
+
+wepy.page({
+  components: {},
+
+  props: {},
+
+  data: {
+    canIUse: wx.canIUse('button.open-type.getUserInfo'),
+    userInfo: {},
+    memberCount: 0,
+    interviewCount: 0,
+    todayBirthday: {},
+    today: '',
+    todayTotal: 0,
+    onInitChart: (F2, config) => {
+      api
+        .get('api/member/yearbirthday', {})
+        .then(res => {
+          const data = res.data.year
+
+          const chart = new F2.Chart(config)
+          chart.source(data, {
+            month: {
+              tickCount: 12
+            }
+          })
+
+          chart.tooltip(false)
+          chart.axis('total', false)
+          chart.axis('month', {
+            label: (text, index, total) => {
+              const cfg = {
+                textAlign: 'center'
+              }
+              cfg.text = text === '0' ? '' : text + '月'
+              return cfg
+            }
+          })
+          chart.interval().position('month*total')
+          chart.render()
+
+          const canvas = chart.get('canvas')
+
+          // 绘制柱状图文本
+          const offset = -5
+          const group = canvas.addGroup()
+          data.forEach(function (obj) {
+            const point = chart.getPosition(obj)
+            group.addShape('text', {
+              attrs: {
+                x: point.x,
+                y: point.y + offset,
+                text: obj.total,
+                textAlign: 'center',
+                textBaseline: 'bottom',
+                fill: '#808080'
+              }
+            })
+          })
+
+          _chart = chart
+          return chart
+        })
+        .catch(error => {
+          console.error('onInitChart', error)
+        })
+    }
+  },
+
+  computed: {},
+
+  methods: {
+    getStatistic() {
+      api
+        .get('api/statistic', {})
+        .then(res => {
+          this.memberCount = res.data.memberCount
+          this.interviewCount = res.data.interviewCount
+          this.todayBirthday = res.data.todayBirthday
+          this.today = res.data.today
+          this.todayTotal = res.data.todayTotal
+        })
+        .catch(error => {
+          console.error('getFamily', error)
+        })
+    },
+
+    onListMembers() {
+      wx.switchTab({
+        url: '/pages/members/index'
+      })
+    },
+
+    onTouchStart(event) {
+      let point = event.$wx.touches[0]
+      let obj = _chart.getRecord({ x: point.clientX, y: point.clientY })
+
+      let month = parseInt(obj.month)
+      if (!isNaN(month)) {
+        if (obj.month - month >= 0.5) {
+          month++
+
+          if (month > 12) {
+            month = 12
+          }
+        }
+        // 避免出现0月的情况
+        if (month < 2) {
+          month = 1
+        }
+
+        this.$app.$options.globalData.searchQuery = `m:${month}`
+
+        wx.switchTab({
+          url: '/pages/members/index'
+        })
+      }
+    },
+
+    onViewMember(memberid) {
+      wx.navigateTo({
+        url: `/pages/members/member?memberid=${memberid}`
+      })
+    }
+  },
+
+  created() {
+  },
+
+  onLoad(options) {
+    this.getStatistic()
+  }
+})
+</script>
+
+<config>
+{
+    navigationBarTitleText: 'TinyCRM',
+    usingComponents: {
+      'f2': '~@/components/f2/index',
+      'van-row': '~@/components/vant/row/index',
+      'van-col': '~@/components/vant/col/index',
+      'van-tag': '~@/components/vant/tag/index',
+      'van-button': '~@/components/vant/button/index',
+      'van-panel': '~@/components/vant/panel/index',
+      'van-progress': '~@/components/vant/progress/index',
+      'van-grid': '~@/components/vant/grid/index',
+      'van-grid-item': '~@/components/vant/grid-item/index'
+    }
+}
+</config>
+
+<style>
+.progress {
+  padding: 30px 50px;
+}
+.birthday {
+  padding-top: 20px;
+}
+.ml2 {
+  margin-left: 2px;
+  margin-right: 2px;
+}
+.van-hairline--top-bottom:after {
+  border-width: 0 !important;
+}
+.f2-chart {
+  width: 100%;
+  height: 350rpx;
+}
+.van-cell__value {
+  color: red !important;
+}
+</style>

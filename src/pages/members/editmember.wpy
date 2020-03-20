@@ -1,0 +1,524 @@
+<template>
+  <div class="container">
+    <view>
+      <van-button type="primary"
+                  size="small"
+                  icon="upgrade"
+                  bind:click="onUpdateMember"
+                  block>保存客户信息</van-button>
+    </view>
+
+    <van-cell-group title="客户姓名">
+      <van-field value="{{ member.membername }}"
+                 required
+                 clearable
+                 label="姓名"
+                 placeholder="请输入客户姓名"
+                 id="membername"
+                 bind:input="onInputMemberInfo" />
+    </van-cell-group>
+
+    <van-cell-group title="客户状态">
+
+      <van-cell is-link
+                title="客户标签"
+                value="{{ tag_title }}"
+                bind:click="onShowPopup('tag')" />
+      <van-popup show="{{ tag_popup }}"
+                 closeable
+                 bind:close="onClosePopup"
+                 position="bottom">
+        <van-checkbox-group value="{{ tags }}"
+                            bind:change="onChangeTags">
+          <van-cell-group title="客户标签">
+            <block v-for="(ttitle, tid) in memberStatusList.tagList"
+                   :key="tag{{ tid }}">
+              <van-cell title="{{ ttitle }}"
+                        value-class="value-class"
+                        clickable
+                        data-index="tag{{ tid }}"
+                        bind:click="{{onToggleTag(tid)}}">
+                <view class="van-cell-value">
+                  <van-checkbox catch:tap="noopTag"
+                                class="tag{{ tid }}"
+                                name="tag{{ tid }}" />
+                </view>
+              </van-cell>
+            </block>
+          </van-cell-group>
+        </van-checkbox-group>
+      </van-popup>
+
+      <van-cell is-link
+                title="签约状态"
+                value="{{ signed_title }}"
+                bind:click="onShowPopup('signed')" />
+      <van-popup show="{{ signed_popup }}"
+                 position="bottom">
+        <van-picker show-toolbar
+                    class="signed"
+                    title="签约状态"
+                    columns="{{ signed_columns }}"
+                    default-index="{{ signed_index }}"
+                    bind:confirm="onConfirm"
+                    bind:cancel="onClosePopup" />
+      </van-popup>
+
+      <van-cell is-link
+                title="销售状态"
+                value="{{ saler_title }}"
+                bind:click="onShowPopup('saler')" />
+      <van-popup show="{{ saler_popup }}"
+                 position="bottom">
+        <van-picker show-toolbar
+                    class="saler"
+                    title="销售状态"
+                    columns="{{ saler_columns }}"
+                    default-index="{{ saler_index }}"
+                    bind:confirm="onConfirm"
+                    bind:cancel="onClosePopup" />
+      </van-popup>
+    </van-cell-group>
+
+    <van-cell-group title="基本信息">
+      <van-cell is-link
+                title="生日"
+                value="{{ birthday }}"
+                bind:click="onShowPopup('birthday')" />
+      <van-popup show="{{ birthday_popup }}"
+                 position="bottom">
+        <van-datetime-picker type="date"
+                             title="生日"
+                             min-date="{{ minBirthdayDate }}"
+                             value="{{ current_birthday }}"
+                             bind:confirm="onConfirmBirthday"
+                             bind:cancel="onClosePopup" />
+      </van-popup>
+
+      <van-cell is-link
+                title="性别"
+                value="{{ gender_title }}"
+                bind:click="onShowPopup('gender')" />
+      <van-popup show="{{ gender_popup }}"
+                 position="bottom">
+        <van-picker show-toolbar
+                    class="gender"
+                    title="性别"
+                    columns="{{ gender_columns }}"
+                    default-index="{{ gender_index }}"
+                    bind:confirm="onConfirm"
+                    bind:cancel="onClosePopup" />
+      </van-popup>
+
+      <van-cell is-link
+                title="婚姻状况"
+                value="{{ marital_title }}"
+                bind:click="onShowPopup('marital')" />
+      <van-popup show="{{ marital_popup }}"
+                 position="bottom">
+        <van-picker show-toolbar
+                    class="marital"
+                    title="婚姻状况"
+                    columns="{{ marital_columns }}"
+                    default-index="{{ marital_index }}"
+                    bind:confirm="onConfirm"
+                    bind:cancel="onClosePopup" />
+      </van-popup>
+
+      <van-field value="{{ member.idcard }}"
+                 clearable
+                 label="身份证"
+                 placeholder="110101xxxxxxxxxx"
+                 id="idcard"
+                 bind:input="onInputMemberInfo" />
+      <van-field value="{{ member.mobile }}"
+                 clearable
+                 label="联系方式"
+                 placeholder="比如：1390xxxxxxx"
+                 id="mobile"
+                 bind:input="onInputMemberInfo" />
+      <van-field value="{{ member.tel }}"
+                 clearable
+                 label="联系方式"
+                 placeholder="比如：34576545"
+                 id="tel"
+                 bind:input="onInputMemberInfo" />
+      <van-field value="{{ member.annual_income }}"
+                 clearable
+                 label="年收入(万元)"
+                 placeholder="比如：40"
+                 id="annual_income"
+                 bind:input="onInputMemberInfo" />
+      <van-field value="{{ member.financing_habit }}"
+                 clearable
+                 label="理财习惯"
+                 placeholder="比如：冒进"
+                 id="financing_habit"
+                 bind:input="onInputMemberInfo" />
+      <van-field value="{{ member.personality }}"
+                 clearable
+                 label="性格"
+                 placeholder="比如：乐观"
+                 id="personality"
+                 bind:input="onInputMemberInfo" />
+      <van-field value="{{ member.hobby }}"
+                 clearable
+                 label="兴趣爱好"
+                 placeholder="比如：篮球"
+                 id="hobby"
+                 bind:input="onInputMemberInfo" />
+      <van-field value="{{ member.home_address }}"
+                 clearable
+                 label="家庭地址"
+                 placeholder="请输入家庭地址"
+                 id="home_address"
+                 bind:input="onInputMemberInfo" />
+      <van-field value="{{ member.home_address_postcode }}"
+                 clearable
+                 label="邮编"
+                 placeholder="家庭地址邮政编码"
+                 id="home_address_postcode"
+                 bind:input="onInputMemberInfo" />
+    </van-cell-group>
+    <van-cell-group title="公司信息">
+      <van-field value="{{ member.company }}"
+                 clearable
+                 label="公司"
+                 placeholder="请输入公司名称"
+                 id="company"
+                 bind:input="onInputMemberInfo" />
+      <van-field value="{{ member.company_title }}"
+                 clearable
+                 label="职位"
+                 placeholder="比如：xx总监"
+                 id="company_title"
+                 bind:input="onInputMemberInfo" />
+      <van-field value="{{ member.company_address }}"
+                 clearable
+                 label="公司地址"
+                 placeholder="请输入公司地址"
+                 id="company_address"
+                 bind:input="onInputMemberInfo" />
+      <van-field value="{{ member.company_address_postcode }}"
+                 clearable
+                 label="邮编"
+                 placeholder="公司地址邮政编码"
+                 id="company_address_postcode"
+                 bind:input="onInputMemberInfo" />
+    </van-cell-group>
+    <van-cell-group title="其他信息">
+      <van-field value="{{ member.description }}"
+                 type="textarea"
+                 autosize
+                 clearable
+                 label="备注"
+                 placeholder="请输入其他补充信息"
+                 id="description"
+                 bind:input="onInputMemberInfo" />
+    </van-cell-group>
+    <view>
+      <van-button type="primary"
+                  size="small"
+                  icon="upgrade"
+                  bind:click="onUpdateMember"
+                  block>保存客户信息</van-button>
+    </view>
+    <van-toast id="van-toast" />
+  </div>
+</template>
+
+<script>
+import wepy from '@wepy/core'
+import api from '@/api/index'
+import utils from '@/utils/index'
+import Toast from '@/components/vant/toast/toast'
+
+wepy.page({
+  components: {},
+
+  props: {},
+
+  data: {
+    memberid: 0,
+    member: {},
+    families: '',
+    memberData: {},
+    memberStatusList: {},
+
+    // 当前操作对象
+    current_key: '',
+
+    tag_title: '',
+    tag_popup: false,
+    tags: [],
+
+    birthday: '',
+    birthday_popup: false,
+    current_birthday: 0,
+    minBirthdayDate: new Date(1949, 9, 1).getTime(),
+
+    gender_title: '',
+    gender_index: 0,
+    gender_popup: false,
+    gender_columns: [],
+    gender_key_index: [],
+
+    marital_title: '',
+    marital_index: 0,
+    marital_popup: false,
+    marital_columns: [],
+    marital_key_index: [],
+
+    signed_title: '',
+    signed_index: 0,
+    signed_popup: false,
+    signed_columns: [],
+    signed_key_index: [],
+
+    saler_title: '',
+    saler_index: 0,
+    saler_popup: false,
+    saler_columns: [],
+    saler_key_index: [],
+
+    updateMemberBtnclicked: false
+  },
+
+  computed: {
+  },
+
+  methods: {
+    getMember() {
+      let data = {}
+      let url = 'api/member/view/' + this.memberid
+      api
+        .get(url, data)
+        .then(res => {
+          this.memberData = res.data
+          this.member = this.memberData.member
+
+          // 在tag id前添加字符串'tag'，给checkbox的name使用
+          for (const tagid of this.member.tags) {
+            this.tags.push('tag' + tagid)
+          }
+          this.tag_title = this.makeTagTitles(this.member.tags)
+
+          this.birthday = this.member.birthday
+          this.current_birthday = utils.getMilliseconds(this.member.birthday)
+
+          this.makeColumnData('gender')
+          this.makeColumnData('marital')
+          this.makeColumnData('signed')
+          this.makeColumnData('saler')
+        })
+        .catch(error => {
+          console.error(`edit.getMember: ${this.memberid}`, error)
+        })
+    },
+
+    makeColumnData(key) {
+      let _list = this.memberStatusList[`${key}List`]
+
+      this[`${key}_columns`] = []
+      this[`${key}_key_index`] = []
+
+      this[`${key}_columns`].push('不确定')
+      this[`${key}_key_index`].push(0)
+      for (let idx in _list) {
+        this[`${key}_columns`].push(_list[parseInt(idx)])
+        this[`${key}_key_index`].push(parseInt(idx))
+      }
+
+      let kidx = parseInt(this.member[key])
+      this[`${key}_index`] = this[`${key}_key_index`].indexOf(kidx)
+      this[`${key}_title`] = _list[kidx]
+    },
+
+    onUpdateMember() {
+      if (this.updateMemberBtnclicked) {
+        Toast.fail('请勿多次点击')
+        return
+      } else {
+        this.updateMemberBtnclicked = true
+        setTimeout(() => {
+          this.updateMemberBtnclicked = false
+        }, 3000)
+      }
+
+      let member = this.member
+
+      member.birthday = this.birthday
+      member.tags = this.removeTagFromTags(this.tags)
+      member.signed = this.signed_key_index[this.signed_index]
+      member.saler = this.saler_key_index[this.saler_index]
+      member.marital = this.marital_key_index[this.marital_index]
+      member.gender = this.gender_key_index[this.gender_index]
+
+      let data = { member: member }
+
+      api
+        .post('api/member/update/' + this.memberid, data)
+        .then(res => {
+          if (res.code === 0) {
+            Toast({
+              type: 'success',
+              message: res.msg,
+              onClose: () => {
+                member.memberid = res.data.memberid
+                this.afterMemberUpdated(member)
+              }
+            })
+          } else {
+            Toast.fail(res.msg)
+          }
+        })
+        .catch(error => {
+          console.error(`onUpdateMember: ${this.memberid}`, error)
+          Toast.fail('更新客户失败')
+        })
+    },
+
+    afterMemberUpdated(member) {
+      // 新增客户
+      if (this.memberid === 0) {
+        wx.redirectTo({
+          url: `/pages/members/member?memberid=${member.memberid}`
+        })
+      } else {
+        let gd = this.$app.$options.globalData
+        gd.member = member
+
+        gd.lastAction['member'] = member.memberid
+
+        wx.navigateBack()
+      }
+    },
+
+    makeTagTitles(tagids) {
+      let titles = []
+      for (let idx in tagids) {
+        titles.push(this.memberStatusList.tagList[tagids[idx]])
+      }
+      return titles.join(', ')
+    },
+
+    removeTagFromTags() {
+      let tagids = []
+      for (let idx in this.tags) {
+        tagids.push(this.tags[idx].substr('tag'.length))
+      }
+
+      return tagids
+    },
+
+    // 保存生日
+    onConfirmBirthday(value) {
+      this.current_birthday = value.$wx.detail
+
+      let day = utils.formatTime(new Date(this.current_birthday))
+      this.birthday = day
+
+      this.onClosePopup()
+    },
+
+    // 销售状况、签约状况、婚姻状况、性别
+    onShowPopup(key) {
+      this.current_key = key
+
+      this[`${key}_popup`] = true
+    },
+
+    onClosePopup() {
+      let key = this.current_key
+      this[`${key}_popup`] = false
+
+      if (key !== 'birthday' && key !== 'tag') {
+        this.$wx.selectComponent(`.${key}`).setIndexes([this[`${key}_index`]])
+      }
+    },
+
+    onConfirm(value) {
+      let _tmp = value.$wx.detail
+      let key = this.current_key
+      this[`${key}_title`] = _tmp.value
+      this[`${key}_index`] = _tmp.index
+
+      this.onClosePopup()
+    },
+
+    // Tag
+    onChangeTags(event) {
+      this.tags = event.$wx.detail
+      this.tag_title = this.makeTagTitles(this.removeTagFromTags(this.tags))
+    },
+
+    onToggleTag(index) {
+      const checkbox = this.$wx.selectComponent(`.tag${index}`)
+      checkbox.toggle()
+    },
+
+    noopTag(event) {
+    },
+
+    // 修改客户信息
+    onInputMemberInfo(event) {
+      this.member[event.$wx.currentTarget.id] = event.$wx.detail
+    }
+  },
+
+  created() {
+    console.log('created')
+
+    this.memberStatusList = this.$app.$options.globalData.memberStatusList
+  },
+
+  onReady() {
+    console.log('onReady')
+  },
+
+  onShow() {
+    console.log('onShow')
+  },
+
+  onHide() {
+    console.log('onHide')
+  },
+
+  onLoad(options) {
+    console.log('onLoad')
+
+    this.memberid = parseInt(options.memberid)
+    if (isNaN(this.memberid)) {
+      this.memberid = 0
+    }
+
+    this.getMember()
+  }
+})
+</script>
+
+<config>
+{
+    navigationBarTitleText: '客户管理',
+    usingComponents: {
+      'van-toast': '~@/components/vant/toast/index',
+      'van-button': '~@/components/vant/button/index',
+      'van-cell': '~@/components/vant/cell/index',
+      'van-cell-group': '~@/components/vant/cell-group/index',
+      'van-icon': '~@/components/vant/icon/index',
+      'van-checkbox': '~@/components/vant/checkbox/index',
+      'van-checkbox-group': '~@/components/vant/checkbox-group/index',
+      'van-field': '~@/components/vant/field/index',
+      'van-switch': '~@/components/vant/switch/index',
+      'van-popup': '~@/components/vant/popup/index',
+      'van-picker': '~@/components/vant/picker/index',
+      'van-datetime-picker': '~@/components/vant/datetime-picker/index'
+    }
+}
+</config>
+
+<style>
+.value-class {
+  flex: none !important;
+}
+</style>

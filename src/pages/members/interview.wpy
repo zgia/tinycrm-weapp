@@ -1,0 +1,170 @@
+<template>
+  <div class="container">
+    <view>
+      <van-button type="primary"
+                  size="small"
+                  icon="add-o"
+                  bind:click="onAddInterview"
+                  block>添加访谈记录</van-button>
+    </view>
+
+    <block v-for="interview in interviews"
+           :key="interview.interviewid">
+      <van-panel title="访谈时间: {{ interview.interviewday }}"
+                 desc="访谈次数: {{ interview.sequence }}"
+                 status="📍{{ interview.address }}"
+                 use-footer-slot
+                 footer-class="footer-class">
+        <view>
+          <view>{{ interview.content }}</view>
+          <van-divider contentPosition="center"
+                       v-if="interview.files.length">附件</van-divider>
+          <view>
+            <block v-for="image in interview.files">
+              <van-image image-class="image-class"
+                         width="80px"
+                         height="80px"
+                         radius="4px"
+                         fit="cover"
+                         src="{{ image }}"
+                         bind:click="onPreviewImage(interview.files, image, $event)" />
+            </block>
+          </view>
+        </view>
+        <view slot="footer">
+          <van-cell center
+                    is-link
+                    link-type="navigateTo"
+                    url="/pages/members/editinterview?memberid={{ memberid }}&interviewid={{ interview.interviewid }}"
+                    title="修改这次访谈记录"
+                    title-class="edit-cell" />
+        </view>
+      </van-panel>
+    </block>
+  </div>
+</template>
+
+<script>
+import wepy from '@wepy/core'
+import api from '@/api/index'
+
+wepy.page({
+  components: {},
+
+  props: {},
+
+  data() {
+    return {
+      memberid: 0,
+      member: {},
+      interviews: {}
+    }
+  },
+
+  methods: {
+    getInterviews() {
+      api
+        .get('api/interview/index/' + this.memberid, {})
+        .then(res => {
+          this.interviews = res.data.interviews
+          this.$app.$options.globalData.interviews = this.interviews
+
+          this.member = this.$app.$options.globalData.member
+
+          wx.setNavigationBarTitle({ title: this.member.membername + '的访谈记录' })
+        })
+        .catch(error => {
+          console.error('getInterviews', error)
+        })
+    },
+
+    onAddInterview() {
+      wx.navigateTo({
+        url: `/pages/members/editinterview?memberid=${this.memberid}`
+      })
+    },
+
+    onEditInterview(interviewid) {
+      wx.navigateTo({
+        url: `/pages/members/editinterview?memberid=${this.memberid}&interviewid=${interviewid}`
+      })
+    },
+    onPreviewImage(files, image, event) {
+      wx.previewImage({
+        urls: files,
+        current: image,
+        fail() {
+          wx.t_t('预览图片失败')
+        }
+      })
+    }
+  },
+
+  created() { },
+
+  onShow() {
+    // 编辑签约信息后返回
+    let gd = this.$app.$options.globalData
+    if (gd.lastAction.interview) {
+      this.interviews = gd.interviews
+
+      delete gd.lastAction.interview
+
+      this.getInterviews()
+    }
+  },
+
+  onLoad(options) {
+    this.memberid = parseInt(options.memberid)
+    if (isNaN(this.memberid)) {
+      this.memberid = 0
+    }
+
+    this.getInterviews()
+  },
+
+  onPullDownRefresh() {
+    this.getInterviews()
+
+    setTimeout(() => {
+      wx.stopPullDownRefresh()
+    }, 1000)
+  }
+})
+</script>
+
+<config>
+{
+    navigationBarTitleText: '客户访谈记录',
+    enablePullDownRefresh: true,
+    usingComponents: {
+      'van-panel': '~@/components/vant/panel/index',
+      'van-divider': '~@/components/vant/divider/index',
+      'van-image': '~@/components/vant/image/index',
+      'van-button': '~@/components/vant/button/index',
+      'van-cell': '~@/components/vant/cell/index',
+      'van-cell-group': '~@/components/vant/cell-group/index',
+      'van-icon': '~@/components/vant/icon/index'
+    }
+}
+</config>
+
+<style>
+.van-panel__content {
+  margin: 15px;
+  white-space: pre-wrap;
+}
+.footer-class {
+  /*text-align: right;*/
+  padding-left: 0 !important;
+}
+.ml5 {
+  margin-left: 5px;
+}
+.image-class {
+  margin: 5px;
+}
+.van-image {
+  margin: 5px;
+}
+</style>

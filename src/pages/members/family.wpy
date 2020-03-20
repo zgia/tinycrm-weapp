@@ -1,0 +1,136 @@
+<template>
+  <div class="container">
+    <view>
+      <van-button type="primary"
+                  size="small"
+                  icon="add-o"
+                  bind:click="onAddFamily"
+                  block>添加亲属</van-button>
+    </view>
+
+    <block v-for="family in families"
+           :key="family.familyid">
+      <van-cell-group title="{{ family.membername }}">
+        <van-cell center
+                  title="姓名"
+                  value="{{ family.membername }}" />
+        <van-cell center
+                  title="与{{ member.membername }}的关系"
+                  value="{{ memberStatusList.relationshipList[family.relationship] }}" />
+        <van-cell center
+                  title="联系方式"
+                  value="{{ family.mobile }}" />
+        <van-cell center
+                  title="生日"
+                  value="{{ family.birthday }}" />
+        <van-cell center
+                  title="备注"
+                  value="{{ family.description }}" />
+        <van-cell center
+                  is-link
+                  link-type="navigateTo"
+                  url="/pages/members/editfamily?memberid={{ memberid }}&familyid={{ family.familyid }}"
+                  title="修改{{ family.membername }}的信息"
+                  title-class="edit-cell" />
+      </van-cell-group>
+    </block>
+    <view v-if="!familyCount">
+      <view style="padding-top:200px;text-align:center;font-size:12px;">还没有亲属信息</view>
+      <view style="padding-top:20px;text-align:center;font-size:12px;">点击添加亲属试一试</view>
+    </view>
+  </div>
+</template>
+
+<script>
+import wepy from '@wepy/core'
+import api from '@/api/index'
+
+wepy.page({
+  components: {},
+
+  props: {},
+
+  data() {
+    return {
+      memberid: 0,
+      member: {},
+      families: {},
+      familyCount: 0,
+      memberStatusList: {}
+    }
+  },
+
+  methods: {
+    getFamily(memberid) {
+      let self = this
+      api
+        .get('api/member/family/' + memberid, {})
+        .then(res => {
+          self.families = res.data.families
+          this.$app.$options.globalData.families = self.families
+
+          self.familyCount = Object.keys(self.families).length
+
+          self.member = this.$app.$options.globalData.member
+
+          wx.setNavigationBarTitle({ title: self.member.membername + '的亲属' })
+        })
+        .catch(error => {
+          console.error('getFamily', error)
+        })
+    },
+
+    onAddFamily() {
+      wx.navigateTo({
+        url: `/pages/members/editfamily?memberid=${this.memberid}`
+      })
+    }
+  },
+
+  created() {
+    this.memberStatusList = this.$app.$options.globalData.memberStatusList
+  },
+
+  onShow() {
+    // 编辑亲属信息后返回
+    let gd = this.$app.$options.globalData
+    if (gd.lastAction.family) {
+      this.families = gd.families
+
+      delete gd.lastAction.family
+    }
+  },
+
+  onLoad(options) {
+    this.memberid = parseInt(options.memberid)
+    if (isNaN(this.memberid)) {
+      this.memberid = 0
+    }
+    this.getFamily(this.memberid)
+  },
+
+  onPullDownRefresh() {
+    this.getFamily(this.memberid)
+
+    setTimeout(() => {
+      wx.stopPullDownRefresh()
+    }, 1000)
+  }
+})
+</script>
+
+<config>
+{
+    navigationBarTitleText: '客户亲属',
+    enablePullDownRefresh: true,
+    usingComponents: {
+      'van-button': '~@/components/vant/button/index',
+      'van-cell': '~@/components/vant/cell/index',
+      'van-cell-group': '~@/components/vant/cell-group/index',
+      'van-icon': '~@/components/vant/icon/index'
+    }
+}
+</config>
+
+<style>
+</style>
