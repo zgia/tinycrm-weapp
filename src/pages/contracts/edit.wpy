@@ -1,0 +1,217 @@
+<template>
+  <div class="container">
+    <view>
+      <van-button type="primary"
+                  size="small"
+                  icon="upgrade"
+                  bind:click="onUpdateContract"
+                  block>保存客户签约记录</van-button>
+    </view>
+
+    <van-cell-group title="签约记录">
+      <van-field value="{{ contract.insurance_title }}"
+                 clearable
+                 label="产品"
+                 placeholder="购买的保险产品"
+                 id="insurance_title"
+                 bind:input="onInputContractInfo" />
+
+      <van-cell is-link
+                title="签约时间"
+                value="{{ signedday }}"
+                bind:click="onShowPopup('signedday')" />
+      <neo-popup-datetime key="signedday"
+                          title="签约时间"
+                          @update-parent-props="updateParentProps($event)"
+                          :show="msPopup.signedday"
+                          :date="signedday" />
+
+      <van-field value="{{ contract.insured_amount }}"
+                 clearable
+                 label="保额(元)"
+                 placeholder="比如：3000000"
+                 id="insured_amount"
+                 bind:input="onInputContractInfo" />
+      <van-field value="{{ contract.premium }}"
+                 clearable
+                 label="保费(元)"
+                 placeholder="比如：3000"
+                 id="premium"
+                 bind:input="onInputContractInfo" />
+      <van-field value="{{ contract.policy_holder }}"
+                 clearable
+                 label="投保人"
+                 placeholder="比如：张三"
+                 id="policy_holder"
+                 bind:input="onInputContractInfo" />
+      <van-field value="{{ contract.recognizee }}"
+                 clearable
+                 label="被保人"
+                 placeholder="比如：李四"
+                 id="recognizee"
+                 bind:input="onInputContractInfo" />
+
+    </van-cell-group>
+
+    <van-toast id="van-toast" />
+    <van-notify id="van-notify" />
+  </div>
+</template>
+
+<script>
+import wepy from '@wepy/core'
+import api from '@/api/index'
+import Toast from '@/components/vant/toast/toast'
+
+wepy.page({
+  components: {},
+
+  props: {},
+
+  data: {
+    memberid: 0,
+    contractid: 0,
+    contract: {},
+
+    // 当前操作对象
+    currentKey: '',
+    // 签约时间
+    signedday: '',
+
+    // 弹窗
+    msPopup: {
+      signedday: false
+    }
+  },
+
+  computed: {
+  },
+
+  methods: {
+    getMember() {
+      if (this.memberid) {
+        this.member = wx.neoGetGD('member')
+        wx.setNavigationBarTitle({ title: this.member.membername + '的签约记录' })
+      }
+    },
+
+    getContract() {
+      this.getMember()
+
+      if (this.contractid !== 0) {
+        let _contracts = wx.neoGetGD('contracts')
+        this.contract = _contracts[this.contractid]
+        this.signedday = this.contract.signed_day
+      } else {
+        this.contract = {}
+        this.signedday = null
+      }
+    },
+
+    onUpdateContract() {
+      if (wx.neoClickMore()) {
+        return
+      }
+
+      let contract = this.contract
+
+      contract.memberid = this.memberid
+      contract.contractid = this.contractid
+      contract.signed_day = this.signedday
+
+      let data = { contract: contract }
+
+      api
+        .post(`api/contract/update`, data)
+        .then(res => {
+          if (res.code === 0) {
+            Toast({
+              type: 'success',
+              message: res.msg,
+              onClose: () => {
+                contract.contractid = res.data.contractid
+                this.afterContractUpdated(contract)
+              }
+            })
+          } else {
+            Toast.fail(res.msg)
+          }
+        })
+        .catch(error => {
+          const err = `onUpdateContract: ${this.memberid}-${this.contractid}, ${error}`
+          Toast.fail(err)
+        })
+    },
+
+    afterContractUpdated(contract) {
+      let gd = wx.neoGD()
+      gd.families[contract.contractid] = contract
+
+      gd.lastAction.contract = contract.contractid
+
+      wx.navigateBack()
+    },
+
+    onShowPopup(key) {
+      this.currentKey = key
+      this.msPopup[key] = true
+    },
+
+    updateParentProps(event) {
+      console.log('event', event)
+
+      switch (event[0]) {
+        case 'popup':
+          this.msPopup[event[1]] = event[2]
+          break
+        case 'data':
+          this[event[1]] = event[2]
+          break
+      }
+    },
+
+    // 修改客户信息
+    onInputContractInfo(event) {
+      this.contract[event.$wx.currentTarget.id] = event.$wx.detail
+    }
+  },
+
+  created() { },
+
+  onLoad(options) {
+    this.memberid = parseInt(options.memberid)
+    if (isNaN(this.memberid)) {
+      this.memberid = 0
+    }
+
+    this.contractid = parseInt(options.contractid)
+    if (isNaN(this.contractid)) {
+      this.contractid = 0
+    }
+
+    this.getContract()
+  }
+})
+</script>
+
+<config>
+{
+    navigationBarTitleText: '客户签约记录',
+    usingComponents: {
+      'van-toast': '~@/components/vant/toast/index',
+      'van-notify': '~@/components/vant/notify/index',
+      'van-button': '~@/components/vant/button/index',
+      'van-cell': '~@/components/vant/cell/index',
+      'van-cell-group': '~@/components/vant/cell-group/index',
+      'van-icon': '~@/components/vant/icon/index',
+      'van-field': '~@/components/vant/field/index',
+      'neo-popup-datetime': '~@/components/neo/popup-datetime'
+    }
+}
+</config>
+
+<style>
+.value-class {
+  flex: none !important;
+}
+</style>

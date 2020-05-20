@@ -1,0 +1,222 @@
+<template>
+  <div class="container">
+    <view class="center-view">
+      <van-button type="primary"
+                  size="small"
+                  icon="edit"
+                  custom-class="btn-margin-2"
+                  bind:click="onEditMember">修改</van-button>
+      <van-button type="info"
+                  size="small"
+                  icon="friends-o"
+                  custom-class="btn-margin-2"
+                  bind:click="onViewFamily">亲属</van-button>
+      <van-button type="info"
+                  size="small"
+                  icon="chat-o"
+                  custom-class="btn-margin-2"
+                  bind:click="onListInterview">访谈</van-button>
+      <van-button type="info"
+                  size="small"
+                  icon="sign"
+                  custom-class="btn-margin-2"
+                  bind:click="onListContract">签约</van-button>
+      <van-button type="info"
+                  size="small"
+                  icon="points"
+                  custom-class="btn-margin-2"
+                  bind:click="onListFile">资料</van-button>
+    </view>
+    <van-cell-group title="{{ member.membername }}">
+      <van-cell title="客户标签"
+                value="{{ tag_title }}" />
+      <van-cell title="签约状态"
+                value="{{ signed_title }}" />
+      <van-cell title="销售状态"
+                value="{{ saler_title }}" />
+    </van-cell-group>
+    <van-cell-group title="基本信息">
+      <van-cell title="生日"
+                value="{{ member.birthday }}" />
+      <van-cell title="性别"
+                value="{{ gender_title }}" />
+      <van-cell title="婚姻状况"
+                value="{{ marital_title }}" />
+      <van-cell title="身份证"
+                value="{{ member.idcard }}" />
+      <van-cell title="联系方式"
+                value="{{ member.mobile }}"
+                clickable
+                bind:click="onMakePhoneCall(member.mobile)" />
+      <van-cell title="联系方式"
+                value="{{ member.tel }}"
+                clickable
+                bind:click="onMakePhoneCall(member.mobile)" />
+      <van-cell title="年收入"
+                value="{{ member.annual_income }}万元" />
+      <van-cell title="理财习惯"
+                value="{{ member.financing_habit }}" />
+      <van-cell title="性格"
+                value="{{ member.personality }}" />
+      <van-cell title="兴趣爱好"
+                value="{{ member.hobby }}" />
+      <van-cell title="家庭地址"
+                value="{{ member.home_address }}({{ member.home_address_postcode }})" />
+    </van-cell-group>
+    <van-cell-group title="公司信息">
+      <van-cell title="公司"
+                value="{{ member.company }}" />
+      <van-cell title="职位"
+                value="{{ member.company_title }}" />
+      <van-cell title="公司地址"
+                value="{{ member.company_address }}({{ member.company_address_postcode }})" />
+    </van-cell-group>
+    <van-cell-group title="备注">
+      <van-cell use-label-slot>
+        <view slot="label"
+              class="van-cell-label">
+          {{ member.description }}
+        </view>
+      </van-cell>
+    </van-cell-group>
+  </div>
+</template>
+
+<script>
+import wepy from '@wepy/core'
+import api from '@/api/index'
+
+wepy.page({
+  components: {},
+
+  props: {},
+
+  data: {
+    memberid: 0,
+    member: {},
+    tag_title: '',
+    gender_title: '',
+    signed_title: '',
+    saler_title: '',
+    marital_title: '',
+    memberStatusList: {}
+  },
+
+  methods: {
+    getMember() {
+      api
+        .get('api/member/view/' + this.memberid)
+        .then(res => {
+          this.member = res.data.member
+          wx.neoSetGD('member', this.member)
+
+          this.processMemberData(this.member)
+
+          wx.setNavigationBarTitle({ title: this.member.membername })
+        })
+        .catch(error => {
+          console.error('getMember', error)
+        })
+    },
+
+    processMemberData(member) {
+      this.tag_title = this.makeTagTitles(member.tags)
+
+      this.signed_title = this.memberStatusList.signedList[member.signed]
+      this.saler_title = this.memberStatusList.salerList[member.saler]
+      this.gender_title = this.memberStatusList.genderList[member.gender]
+      this.marital_title = this.memberStatusList.maritalList[member.marital]
+    },
+
+    makeTagTitles(tagids) {
+      let titles = []
+      tagids.map(tagid => {
+        titles.push(this.memberStatusList.tagList[tagid])
+      })
+      return titles.join(', ')
+    },
+
+    onMakePhoneCall(phone) {
+      if (phone) {
+        wx.makePhoneCall({
+          phoneNumber: phone,
+          complete: (res) => { console.log(`拨号：${phone}`, res) }
+        })
+      }
+    },
+
+    onEditMember() {
+      wx.navigateTo({
+        url: `/pages/members/edit?memberid=${this.memberid}`
+      })
+    },
+
+    onViewFamily() {
+      wx.navigateTo({
+        url: `/pages/family/index?memberid=${this.memberid}`
+      })
+    },
+
+    onListInterview() {
+      wx.navigateTo({
+        url: `/pages/interviews/index?memberid=${this.memberid}`
+      })
+    },
+
+    onListContract() {
+      wx.navigateTo({
+        url: `/pages/contracts/index?memberid=${this.memberid}`
+      })
+    },
+
+    onListFile() {
+      wx.navigateTo({
+        url: `/pages/files/index?memberid=${this.memberid}`
+      })
+    }
+  },
+
+  created() {
+    this.memberStatusList = wx.neoGetGD('memberStatusList')
+  },
+
+  onShow() {
+    // 编辑客户信息后返回
+    let lastAction = wx.neoGetGD('lastAction')
+    if (lastAction.member) {
+      this.member = wx.neoGetGD('member')
+      this.processMemberData(this.member)
+
+      delete lastAction.member
+    }
+  },
+
+  onLoad(options) {
+    this.memberid = parseInt(options.memberid)
+    if (isNaN(this.memberid)) {
+      this.memberid = 0
+    }
+
+    this.getMember()
+  }
+})
+</script>
+
+<config>
+{
+    navigationBarTitleText: '我的客户',
+    usingComponents: {
+      'van-button': '~@/components/vant/button/index',
+      'van-cell': '~@/components/vant/cell/index',
+      'van-cell-group': '~@/components/vant/cell-group/index',
+      'van-icon': '~@/components/vant/icon/index'
+    }
+}
+</config>
+
+<style>
+.van-cell-label {
+  color: #323233;
+  white-space: pre-wrap;
+}
+</style>

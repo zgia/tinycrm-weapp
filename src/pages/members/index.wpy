@@ -1,0 +1,258 @@
+<template>
+  <div class="container">
+    <van-search value="{{ searchQuery }}"
+                placeholder="搜索客户姓名"
+                use-action-slot
+                bind:change="onChangeQuery"
+                bind:search="onSearch">
+      <view slot="action"
+            bind:tap="onAddMember">
+        <van-button size="small"
+                    icon="add-o"
+                    type="primary">新增客户</van-button>
+      </view>
+    </van-search>
+
+    <van-cell-group>
+      <block v-for="member in members"
+             :key="{{ member.memberid }}">
+
+        <van-swipe-cell id="swipe-cell-{{ member.memberid }}"
+                        data-id="{{ member.memberid }}"
+                        right-width="{{ 65 }}"
+                        async-close
+                        bind:close="onCloseSwipe"
+                        bind:open="onOpenSwipe">
+          <van-cell center
+                    class=""
+                    data-id="member.memberid"
+                    title="{{ member.membername }}{{ member.gender === 1 ? '👦' : (member.gender === 2 ? '👱‍♀️' : '👤') }}"
+                    value="{{ member.tags }}"
+                    label="🎂{{ member.birthday }}"
+                    clickable="true"
+                    @click="onViewMember(member.memberid)" />
+          <view slot="right"
+                class="swipe-cell-right">删除</view>
+        </van-swipe-cell>
+
+      </block>
+    </van-cell-group>
+
+    <view v-if="noMoreMember">
+      <van-divider contentPosition="center">客户只有这么多，加油啊</van-divider>
+    </view>
+
+    <van-action-sheet show="{{ showDeleteActionSheet }}"
+                      :actions="[{ name: '删除', color: '#ff0000' }]"
+                      cancel-text="取消"
+                      description="您要删除此客户吗？删除后不可以恢复。"
+                      bind:close="onCancelActionSheet"
+                      bind:cancel="onCancelActionSheet"
+                      bind:select="doDeleteActionSheet" />
+  </div>
+</template>
+
+<script>
+import wepy from '@wepy/core'
+import api from '@/api/index'
+
+wepy.page({
+  components: {},
+
+  props: {},
+
+  data: {
+    page: 1,
+    noMoreMember: false,
+    members: [],
+    logs: [],
+    searchQuery: '',
+    deleteAction: false,
+    // 删除的action-sheet确认
+    showDeleteActionSheet: false,
+    toDeletedMemberId: 0,
+
+    // onShow不加载
+    loaded: false
+  },
+
+  computed: {
+  },
+
+  methods: {
+    getMemberList() {
+      let sq = wx.neoGetGD('searchQuery')
+      if (sq) {
+        this.searchQuery = sq
+
+        wx.neoSetGD('searchQuery', null)
+      }
+
+      let data = { membername: this.searchQuery, p: this.page }
+      api
+        .get('api/member/index', data)
+        .then(res => {
+          this.noMoreMember = res.data.noMoreMember
+
+          if (this.page === 1) {
+            this.members = res.data.members
+          } else {
+            let index = this.members.length
+            let newData = []
+            res.data.members.forEach((item) => {
+              newData['members[' + (index++) + ']'] = item
+            })
+            this.$wx.setData(newData)
+          }
+        })
+        .catch(error => {
+          console.error('getMemberList', error)
+        })
+    },
+
+    onChangeQuery(event) {
+      this.searchQuery = event.$wx.detail
+    },
+
+    onSearch() {
+      this.page = 1
+      this.getMemberList()
+    },
+
+    onViewMember(memberid) {
+      wx.navigateTo({
+        url: `/pages/members/view?memberid=${memberid}`
+      })
+    },
+
+    onAddMember(event) {
+      wx.navigateTo({
+        url: `/pages/members/edit?memberid=0`
+      })
+    },
+
+    deleteMember(id) {
+      let index = -1
+      this.members.map((m, idx) => {
+        if (m.memberid === id) {
+          index = idx
+        }
+      })
+
+      if (index !== -1) {
+        api
+          .del('api/member/delete/' + this.members[index].memberid)
+          .then(res => {
+            if (res.code === 0) {
+              this.$delete(this.members, index)
+            } else {
+              wx.neoToast(res.msg)
+            }
+          })
+          .catch(error => {
+            console.error('deletemember', error)
+          })
+      }
+    },
+
+    onOpenSwipe(event) {
+      const { position, name } = event.$wx.detail
+      console.log(`${name}${position}部分展示open事件被触发`)
+
+      this.deleteAction = true
+    },
+
+    onCloseSwipe(event) {
+      this.deleteAction = false
+
+      const { position, instance } = event.$wx.detail
+      switch (position) {
+        case 'left':
+        case 'cell':
+          instance.close()
+          break
+        case 'right':
+          instance.close()
+          this.toDeletedMemberId = event.currentTarget.dataset.id
+          this.showDeleteActionSheet = true
+          break
+      }
+    },
+
+    onCancelActionSheet() {
+      this.showDeleteActionSheet = false
+    },
+
+    doDeleteActionSheet(event) {
+      this.deleteMember(this.toDeletedMemberId)
+    }
+  },
+
+  created() {
+  },
+
+  onShow(options) {
+    if (!this.loaded) {
+      this.getMemberList()
+    }
+
+    this.loaded = false
+  },
+
+  onLoad(options) {
+    this.loaded = true
+
+    this.getMemberList()
+  },
+
+  onPullDownRefresh() {
+    this.getMemberList()
+
+    setTimeout(() => {
+      wx.stopPullDownRefresh()
+    }, 1000)
+  },
+
+  onReachBottom() {
+    if (!this.noMoreMember) {
+      this.page++
+      this.getMemberList()
+    }
+  }
+}
+)
+</script>
+
+<config>
+{
+    navigationBarTitleText: '我的客户',
+    enablePullDownRefresh: true,
+    usingComponents: {
+      'van-action-sheet': '~@/components/vant/action-sheet/index',
+      'van-divider': '~@/components/vant/divider/index',
+      'van-button': '~@/components/vant/button/index',
+      'van-search': '~@/components/vant/search/index',
+      'van-swipe-cell': '~@/components/vant/swipe-cell/index',
+      'van-cell': '~@/components/vant/cell/index',
+      'van-cell-group': '~@/components/vant/cell-group/index',
+      'van-icon': '~@/components/vant/icon/index'
+    }
+}
+</config>
+
+<style>
+.swipe-cell-right {
+  color: #fff;
+}
+.van-swipe-cell__left,
+.van-swipe-cell__right {
+  background-color: red;
+  width: 65px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.van-button--small {
+  height: 34px !important;
+}
+</style>

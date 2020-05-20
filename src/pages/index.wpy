@@ -1,0 +1,271 @@
+<template>
+  <div class="container">
+    <van-grid column-num="2">
+      <van-grid-item icon="friends-o"
+                     text="{{ memberCount }}名客户"
+                     bind:click="onListMembers" />
+      <van-grid-item icon="flower-o"
+                     text="{{ interviewCount }}次访谈" />
+    </van-grid>
+
+    <van-panel title="🎂生日提醒({{ today }})"
+               status="今天{{ todayTotal }}人"
+               class="birthday">
+      <view class="center-view">
+        <block v-for="tb in todayBirthday">
+          <van-button custom-class="btn-margin-2"
+                      custom-style="border:0"
+                      bind:click="onViewMember(tb.memberid)">
+            {{ tb.membername }}({{ tb.age }}岁)
+          </van-button>
+        </block>
+      </view>
+    </van-panel>
+
+    <view class="center">
+      <f2 class="f2-chart"
+          onInit="{{ onInitChart }}"
+          @touchstart="onTouchStart" />
+    </view>
+  </div>
+</template>
+
+<script>
+import wepy from '@wepy/core'
+import api from '@/api/index'
+
+let _chart
+let _chartGroup
+// 用于点击柱状图的跳转
+let yearBirthday = {}
+
+const makeYearBirthdayData = (data) => {
+  data.map(d => { yearBirthday[d.month] = d.total })
+}
+
+const getYearBirthday = () => {
+  return api.get('api/yearbirthday')
+}
+
+const drawChartTxt = (chart, data) => {
+  const canvas = chart.get('canvas')
+
+  // 绘制柱状图文本
+  const offset = -5
+  _chartGroup = canvas.addGroup()
+  data.forEach(function (obj) {
+    const point = chart.getPosition(obj)
+    _chartGroup.addShape('text', {
+      attrs: {
+        x: point.x,
+        y: point.y + offset,
+        text: obj.total,
+        textAlign: 'center',
+        textBaseline: 'bottom',
+        fill: '#808080'
+      }
+    })
+  })
+}
+
+const drawChart = (F2, config, data) => {
+  makeYearBirthdayData(data)
+
+  // https://github.com/antvis/wx-f2/issues/260
+  // 临时解决微信 7.0.12，canvas绘图失败的bug
+  F2.Global.fontFamily = 'sans-serif'
+
+  const chart = new F2.Chart(config)
+  chart.source(data, {
+    month: {
+      tickCount: 12
+    }
+  })
+
+  chart.tooltip(false)
+  chart.axis('total', false)
+  chart.axis('month', {
+    label: (text, index, total) => {
+      const cfg = {
+        textAlign: 'center'
+      }
+      cfg.text = text === '0' ? '' : text + '月'
+      return cfg
+    }
+  })
+  chart.interval().position('month*total')
+  chart.render()
+
+  drawChartTxt(chart, data)
+
+  _chart = chart
+
+  return (chart)
+}
+
+const drawYearBirthdayChart = (F2, config) => {
+  getYearBirthday()
+    .then(res => {
+      return drawChart(F2, config, res.data.year)
+    })
+    .catch(error => {
+      console.error('drawYearBirthdayChart', error)
+
+      return null
+    })
+}
+
+wepy.page({
+  components: {},
+
+  props: {},
+
+  data: {
+    canIUse: wx.canIUse('button.open-type.getUserInfo'),
+    userInfo: {},
+    memberCount: 0,
+    interviewCount: 0,
+    todayBirthday: {},
+    today: '',
+    todayTotal: 0,
+    onInitChart: (F2, config) => {
+      return drawYearBirthdayChart(F2, config)
+    }
+  },
+
+  computed: {},
+
+  methods: {
+    getStatistic() {
+      api
+        .get('api/statistic')
+        .then(res => {
+          this.memberCount = res.data.memberCount
+          this.interviewCount = res.data.interviewCount
+          this.todayBirthday = res.data.todayBirthday
+          this.today = res.data.today
+          this.todayTotal = res.data.todayTotal
+        })
+        .catch(error => {
+          console.error('getStatistic', error)
+        })
+    },
+
+    onListMembers() {
+      wx.switchTab({
+        url: '/pages/members/index'
+      })
+    },
+
+    onTouchStart(event) {
+      let point = event.$wx.touches[0]
+      let obj = _chart.getRecord({ x: point.clientX, y: point.clientY })
+
+      let month = parseInt(obj.month)
+      if (!isNaN(month)) {
+        // 考虑偏移，空白区域的一半
+        if (obj.month - month >= 0.75) {
+          month++
+
+          if (month > 12) {
+            month = 12
+          }
+        }
+        // 避免出现0月的情况
+        if (month < 2) {
+          month = 1
+        }
+
+        // 有客户才跳转
+        if (yearBirthday[month] > 0) {
+          wx.neoSetGD('searchQuery', `m:${month}`)
+
+          wx.switchTab({
+            url: '/pages/members/index'
+          })
+        } else {
+          wx.neoToast(`没有${month}月过生日的客户`)
+        }
+      }
+    },
+
+    onViewMember(memberid) {
+      wx.navigateTo({
+        url: `/pages/members/member?memberid=${memberid}`
+      })
+    }
+  },
+
+  onPullDownRefresh() {
+    this.getStatistic()
+
+    getYearBirthday()
+      .then(res => {
+        const data = res.data.year
+
+        makeYearBirthdayData(data)
+
+        _chart.changeData(data)
+        _chartGroup.clear()
+        drawChartTxt(_chart, data)
+      })
+      .catch(error => {
+        console.error('onInitChart', error)
+      })
+
+    setTimeout(() => {
+      wx.stopPullDownRefresh()
+    }, 1000)
+  },
+
+  created() {
+  },
+
+  onLoad(options) {
+    this.getStatistic()
+  }
+})
+</script>
+
+<config>
+{
+    navigationBarTitleText: 'TinyCRM',
+    enablePullDownRefresh: true,
+    usingComponents: {
+      'f2': '~@/components/f2/index',
+      'van-row': '~@/components/vant/row/index',
+      'van-col': '~@/components/vant/col/index',
+      'van-tag': '~@/components/vant/tag/index',
+      'van-button': '~@/components/vant/button/index',
+      'van-panel': '~@/components/vant/panel/index',
+      'van-progress': '~@/components/vant/progress/index',
+      'van-grid': '~@/components/vant/grid/index',
+      'van-grid-item': '~@/components/vant/grid-item/index'
+    }
+}
+</config>
+
+<style>
+.progress {
+  padding: 30px 50px;
+}
+.birthday {
+  padding-top: 20px;
+}
+.van-hairline--top-bottom:after {
+  border-width: 0 !important;
+}
+.van-cell__value {
+  color: red !important;
+}
+.center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.f2-chart {
+  padding: 0 16px;
+  width: 100%;
+  height: 350rpx;
+}
+</style>

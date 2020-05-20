@@ -1,0 +1,269 @@
+<template>
+  <div class="container">
+    <view class="center-view">
+      <van-button type="primary"
+                  size="small"
+                  icon="edit"
+                  custom-class="btn-margin-2"
+                  bind:click="onEditFile">修改</van-button>
+      <van-button wx:if="{{ file.cover }}"
+                  type="primary"
+                  size="small"
+                  icon="down"
+                  custom-class="btn-margin-2"
+                  bind:click="onDownloadFile">下载</van-button>
+      <van-button type="danger"
+                  size="small"
+                  icon="delete"
+                  custom-class="btn-margin-2"
+                  bind:click="onDeleteFile">删除</van-button>
+    </view>
+
+    <view class="description">
+      {{ file.description }}
+    </view>
+
+    <view class="center-view">
+      <van-image width="{{ imgWidth }}"
+                 height="{{ imgHeight }}"
+                 src="{{ file.url_medium }}"
+                 bind:load="onLoadImage"
+                 bind:click="onPreviewImage()" />
+    </view>
+
+    <van-action-sheet show="{{ showDeleteActionSheet }}"
+                      :actions="[{ name: '删除', color: '#ff0000' }]"
+                      cancel-text="取消"
+                      description="您要删除此文件吗？删除后不可以恢复。"
+                      bind:close="onCancelActionSheet"
+                      bind:cancel="onCancelActionSheet"
+                      bind:select="doDeleteActionSheet" />
+
+    <van-dialog use-slot
+                title="编辑备注"
+                show="{{ showDescriptionEditor }}"
+                show-cancel-button
+                bind:close="onCloseEditor"
+                bind:confirm="doEditDescription">
+      <van-field value="{{ file.description }}"
+                 clearable
+                 placeholder="文件备注"
+                 id="description"
+                 bind:input="onInputFileInfo" />
+    </van-dialog>
+
+    <van-toast id="van-toast" />
+    <van-notify id="van-notify" />
+
+  </div>
+</template>
+
+<script>
+import wepy from '@wepy/core'
+import api from '@/api/index'
+import utils from '@/utils/index'
+import Toast from '@/components/vant/toast/toast'
+
+wepy.page({
+  components: {},
+
+  props: {},
+
+  data: {
+    memberid: 0,
+    member: {},
+    fileid: 0,
+    file: {},
+    description: null,
+    fileDay: null,
+    fileIndex: 0,
+    screenWidth: 0,
+    screenHeight: 0,
+    imgWidth: 0,
+    imgHeight: 0,
+    showDeleteActionSheet: false,
+    showDescriptionEditor: false
+  },
+
+  methods: {
+    getFile() {
+      let files = wx.neoGetGD('files')
+      for (let day in files) {
+        files[day].map((file, idx) => {
+          if (parseInt(file.fileid) === this.fileid) {
+            this.file = file
+            this.fileDay = day
+            this.fileIndex = idx
+          }
+        })
+      }
+
+      console.log(this.file)
+    },
+
+    onDeleteFile() {
+      this.showDeleteActionSheet = true
+    },
+
+    doDeleteActionSheet(event) {
+      console.log(event.$wx.detail)
+
+      api
+        .del(`api/file/delete/${this.fileid}`, {})
+        .then(res => {
+          if (res.code === 0) {
+            Toast({
+              type: 'success',
+              message: res.msg,
+              onClose: () => {
+                this.afterFileDeleted()
+              }
+            })
+          } else {
+            Toast.fail(res.msg)
+          }
+        })
+        .catch(error => {
+          Toast.fail(`onDeleteFile: ${this.memberid}-${this.fileid}`, error)
+        })
+    },
+
+    afterFileDeleted() {
+      let files = wx.neoGetGD('files')
+      let dayFiles = files[this.fileDay]
+      dayFiles.splice(this.fileIndex, 1)
+
+      if (dayFiles.length === 0) {
+        delete files[this.fileDay]
+      }
+
+      wx.navigateBack()
+    },
+
+    onCancelActionSheet() {
+      this.showDeleteActionSheet = false
+    },
+
+    onEditFile() {
+      this.showDescriptionEditor = true
+    },
+
+    onInputFileInfo(event) {
+      console.log(event.$wx)
+      this.description = event.$wx.detail
+    },
+
+    onCloseEditor() {
+      this.showDescriptionEditor = false
+    },
+
+    doEditDescription() {
+      console.log(this.description, this.file)
+      this.file.description = this.description
+
+      api
+        .post(`api/file/description`, { fileid: this.fileid, description: this.description })
+        .then(res => {
+          if (res.code === 0) {
+            Toast({
+              type: 'success',
+              message: res.msg,
+              onClose: () => {
+                this.afterFileUpdated()
+              }
+            })
+          } else {
+            Toast.fail(res.msg)
+          }
+        })
+        .catch(error => {
+          const err = `onUpdateFile: ${this.memberid}-${this.fileid}, ${error}`
+          Toast.fail(err)
+        })
+    },
+
+    afterFileUpdated() {
+      wx.navigateBack()
+    },
+
+    onLoadImage: function (event) {
+      let w = event.$wx.detail.width
+      let h = event.$wx.detail.height
+
+      if (h < this.screenHeight || w < this.screenWidth) {
+        this.imgWidth = w
+        this.imgHeight = h
+      } else {
+        let ratio = h / w
+        this.imgWidth = this.screenWidth * 0.9
+        this.imgHeight = this.imgWidth * ratio
+      }
+    },
+    onPreviewImage(event) {
+      if (!this.file.cover) {
+        wx.previewImage({
+          urls: [this.file.url],
+          current: this.file.url,
+          fail() {
+            wx.neoToast('预览图片失败')
+          }
+        })
+      }
+    },
+
+    onDownloadFile() {
+      if (wx.neoClickMore()) {
+        return
+      }
+
+      utils.openDoc(this.file.url)
+    }
+  },
+
+  created() { },
+
+  onShow() { },
+
+  onLoad(options) {
+    this.memberid = parseInt(options.memberid)
+    if (isNaN(this.memberid)) {
+      this.memberid = 0
+    }
+    this.fileid = parseInt(options.fileid)
+    if (isNaN(this.fileid)) {
+      this.fileid = 0
+    }
+
+    let systemInfo = wx.getSystemInfoSync()
+    this.screenWidth = systemInfo.screenWidth
+    this.screenHeight = systemInfo.screenHeight
+
+    this.getFile()
+  }
+})
+</script>
+
+<config>
+{
+    navigationBarTitleText: '客户资料',
+    usingComponents: {
+      'van-toast': '~@/components/vant/toast/index',
+      'van-notify': '~@/components/vant/notify/index',
+      'van-dialog': '~@/components/vant/dialog/index',
+      'van-field': '~@/components/vant/field/index',
+      'van-action-sheet': '~@/components/vant/action-sheet/index',
+      'van-image': '~@/components/vant/image/index',
+      'van-button': '~@/components/vant/button/index',
+      'van-icon': '~@/components/vant/icon/index'
+    }
+}
+</config>
+
+<style>
+.description {
+  padding: 10px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+</style>

@@ -1,0 +1,144 @@
+<template>
+  <div class="container">
+
+    <van-notice-bar style="padding-bottom:10px"
+                    wx:if="{{ !userInfo.actived }}"
+                    wrapable
+                    scrollable="false"
+                    left-icon="bullhorn-o"
+                    text="您还未激活，您所做的操作将不会被保存。如果您想使用，请联系管理员。" />
+
+    <van-card>
+      <view slot="thumb"
+            class="avatar">
+        <open-data type="userAvatarUrl"></open-data>
+      </view>
+      <view slot="title"
+            class="nickname">
+        <open-data type="userNickName"></open-data>
+      </view>
+      <view slot="desc">
+        UID: {{ userInfo.userId }}
+      </view>
+      <view slot="price">
+        为MDRT加油💪
+      </view>
+      <view slot="footer">
+        <van-button wx:if="{{ canIUse && !userInfo.nickName }}"
+                    open-type="getUserInfo"
+                    bindgetuserinfo="bindGetUserInfo">授权登录</van-button>
+      </view>
+    </van-card>
+
+    <van-cell-group title="代码已经开源">
+      <van-cell center
+                clickable
+                title="地址"
+                title-width="100px"
+                value="{{ srcUrl }}"
+                bind:click="onCopySrcUrl" />
+    </van-cell-group>
+  </div>
+</template>
+
+<script>
+import wepy from '@wepy/core'
+import api from '@/api/index'
+
+wepy.page({
+  components: {},
+
+  props: {},
+
+  data: {
+    canIUse: wx.canIUse('button.open-type.getUserInfo'),
+    userInfo: {
+      userId: 0,
+      avatarUrl: '',
+      nickName: 'VIP',
+      realName: '',
+      openId: '',
+      actived: 0
+    },
+    srcUrl: 'https://github.com/zgia/tinycrm'
+  },
+
+  computed: {},
+
+  methods: {
+    onCopySrcUrl(event) {
+      wx.setClipboardData({
+        data: this.srcUrl
+      })
+    },
+
+    bindGetUserInfo(event) {
+      this.userInfo = event.$wx.detail.userInfo
+    },
+    getUser() {
+      api
+        .get('api/user', {})
+        .then(res => {
+          this.userInfo.userId = res.data.userid
+          this.userInfo.nickName = res.data.username
+          this.userInfo.realName = res.data.realname
+          this.userInfo.actived = parseInt(res.data.actived)
+        })
+        .catch(error => {
+          console.error('getUser', error)
+        })
+    },
+    onGetOpenid() {
+      wx.login({
+        success: res => {
+          api
+            .get('/api/openid', { code: res.code })
+            .then(logined => {
+              this.userInfo.openId = logined.data.openid
+            })
+            .catch(error => {
+              console.error('onGetOpenid', error)
+            })
+        },
+        fail: res => {
+          console.error('onGetOpenid', res)
+        }
+      })
+    }
+  },
+
+  created() { },
+
+  onLoad(options) {
+    this.getUser()
+  }
+})
+</script>
+
+<config>
+{
+    navigationBarTitleText: '我',
+    usingComponents: {
+      'van-notice-bar': '~@/components/vant/notice-bar/index',
+      'van-card': '~@/components/vant/card/index',
+      'van-cell-group': '~@/components/vant/cell-group/index',
+      'van-cell': '~@/components/vant/cell/index',
+      'van-tag': '~@/components/vant/tag/index',
+      'van-button': '~@/components/vant/button/index',
+      'van-image': '~@/components/vant/image/index'
+    }
+}
+</config>
+
+<style>
+.avatar {
+  overflow: hidden;
+  border-radius: 50%;
+  width: 80px;
+  height: 80px;
+}
+.nickname {
+  font-size: 16px;
+  padding-bottom: 5px;
+}
+</style>

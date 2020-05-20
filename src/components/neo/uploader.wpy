@@ -1,0 +1,227 @@
+<template>
+  <div>
+    <view class="upload-files">
+      <van-uploader file-list="{{ fileCoverList }}"
+                    max-size="{{ fileMaxSize }}"
+                    accept="{{ fileType }}"
+                    sizeType="['original']"
+                    image-fit="cover"
+                    multiple
+                    preview-full-image="{{ false }}"
+                    use-before-read
+                    bind:beforeread="beforeReadFile"
+                    bind:afterread="afterReadFile"
+                    bind:oversize="oversizeFile"
+                    bind:delete="deleteFile"
+                    bind:clickpreview="clickPreviewImage" />
+    </view>
+  </div>
+</template>
+
+<script>
+import md5 from 'js-md5'
+import wepy from '@wepy/core'
+import cfg from '@/api/config'
+import utils from '@/utils/index'
+import Dialog from '@/components/vant/dialog/dialog'
+
+wepy.component({
+  props: {
+    fileType: {
+      type: String,
+      default: 'image'
+    },
+    memberid: {
+      type: Number,
+      default: 0
+    },
+    fileList: {
+      type: Array,
+      default: []
+    },
+    fileCoverList: {
+      type: Array,
+      default: []
+    }
+  },
+
+  watch: {
+    fileType(newValue, oldValue) {
+      console.log(`fileType: ${oldValue} -> ${newValue}`)
+    },
+    memberid(newValue, oldValue) {
+      console.log(`memberid: ${oldValue} -> ${newValue}`)
+    }
+  },
+
+  data() {
+    return {
+      // 是否允许同时上传多个文件
+      multiple: true,
+
+      // 允许上传的文件大小
+      fileMaxSizeTip: '',
+      fileMaxSize: 0,
+      // 允许上传的文件扩展名
+      fileAllowType: null,
+      fileImageType: null,
+
+      // 添加文件
+      newFileList: [],
+      // 删除文件
+      deletedFileList: []
+    }
+  },
+
+  computed: {
+  },
+
+  methods: {
+    init() {
+      this.fileMaxSize = wx.neoGetGD('fileMaxSize')
+      this.fileMaxSizeTip = utils.renderSize(wx.neoGetGD('fileMaxSize'))
+      this.fileImageType = new RegExp('.(' + wx.neoGetGD('fileImageType') + ')$')
+      this.fileAllowType = new RegExp('.(' + wx.neoGetGD('fileAllowType') + ')$')
+    },
+
+    beforeReadFile(event) {
+      const { file, callback } = event.$wx.detail
+      console.log('beforeReadFile', file)
+
+      let accepted = true
+      if (this.multiple) {
+        file.map(f => {
+          accepted = accepted && this.fileAllowType.test(f.path)
+        })
+      } else {
+        accepted = this.fileAllowType.test(file.path)
+      }
+
+      wx.neoToast(accepted ? '上传中' : '无效文件类型')
+
+      callback(accepted)
+    },
+
+    afterReadFile(event) {
+      // 当设置 mutiple 为 true 时, file 为数组格式，否则为对象格式
+      // file = {size: 85101, path: "http://tmp/wx55a97715a3e2ea10.o6zAJsz0TxajvDT_OgA6wuKa_czQ.sez3xqEF3fsS94c7736c3194b5c42cc637cfca8cdcc1.png"}
+      const file = event.$wx.detail.file
+      console.log('afterReadFile', file)
+
+      if (file.path) {
+        file.name = md5(file.path + file.size)
+        this.wxUploadFile(file)
+      } else {
+        file.map(f => {
+          f.name = md5(f.path + f.size)
+          this.wxUploadFile(f)
+        })
+      }
+    },
+
+    wxUploadFile(file) {
+      let token = cfg.bearerToken()
+      console.log('wxUploadFile', token)
+
+      wx.uploadFile({
+        url: cfg.host() + '/upload/' + file.name,
+        filePath: file.path,
+        name: file.name,
+        header: { authorization: token },
+        formData: {
+          dir: 'file/' + this.memberid,
+          ajax: 1,
+          weapp: 1,
+          name: file.name
+        },
+        success: res => {
+          let data = JSON.parse(res.data)
+          console.log('afterReadFile', data)
+
+          if (data.code === 0) {
+            // 上传完成需要更新 fileList
+            const { fileList = [], fileCoverList = [] } = this
+            fileList.push({ url: data.data.url })
+            fileCoverList.push({ url: data.data.thumbnailUrl })
+
+            this.newFileList.push(data.data.url)
+
+            this.updateParentData({ newfile: this.newFileList })
+          } else {
+            wx.neoToast(data.msg)
+          }
+        },
+        fail: error => {
+          wx.neoToast(error.errMsg)
+        }
+      })
+    },
+
+    updateParentData(data) {
+      if (data.newfile) {
+        this.$parent.newFileList = data.newfile
+      }
+
+      if (data.deletedfile) {
+        this.$parent.deletedFileList = data.deletedfile
+      }
+    },
+
+    oversizeFile(event) {
+      wx.neoToast(`文件超过最大尺寸${this.fileMaxSizeTip}`)
+    },
+
+    deleteFile(event) {
+      Dialog.confirm({
+        title: '删除文件',
+        message: '确认要删除这个文件吗？'
+      }).then(() => {
+        let idx = event.$wx.detail.index
+        this.deletedFileList.push(this.fileList[idx].url)
+        this.fileList.splice(idx, 1)
+        this.fileCoverList.splice(idx, 1)
+
+        this.updateParentData({ deletedfile: this.deletedFileList })
+      }).catch(() => {
+        // on cancel
+      })
+    },
+
+    clickPreviewImage(event) {
+      let url = this.fileList[event.$wx.detail.index].url
+      let isImage = this.fileImageType.test(url)
+
+      if (isImage) {
+        wx.previewImage({
+          urls: [url],
+          current: url,
+          fail: (error) => {
+            wx.neoToast('无法预览图片')
+            console.error('clickPreviewImage', error)
+          }
+        })
+      } else {
+        utils.openDoc(url)
+      }
+    }
+  },
+
+  created() {
+    this.init()
+  }
+})
+</script>
+
+<config>
+{
+    usingComponents: {
+      'van-uploader': '~@/components/vant/uploader/index'
+    }
+}
+</config>
+
+<style>
+.upload-files {
+  padding-top: 20px;
+}
+</style>

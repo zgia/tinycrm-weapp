@@ -1,0 +1,141 @@
+<template>
+  <div class="container">
+    <view>
+      <van-button type="primary"
+                  size="small"
+                  icon="add-o"
+                  bind:click="onAddContract"
+                  block>添加签约记录</van-button>
+    </view>
+
+    <block v-for="contract in contracts"
+           :key="contract.contractid">
+      <van-cell-group title="{{ contract.signed_day }} 签约 {{ contract.insurance_title }}">
+        <van-cell center
+                  title="产品"
+                  value="{{ contract.insurance_title }}" />
+        <van-cell center
+                  title="签约时间"
+                  value="{{ contract.signed_day }}" />
+        <van-cell center
+                  title="保额"
+                  value="{{ contract.insured_amount }}" />
+        <van-cell center
+                  title="保费"
+                  value="{{ contract.premium }}" />
+        <van-cell center
+                  title="投保人"
+                  value="{{ contract.policy_holder }}" />
+        <van-cell center
+                  title="被保人"
+                  value="{{ contract.recognizee }}" />
+
+        <van-cell center
+                  is-link
+                  link-type="navigateTo"
+                  url="/pages/contracts/edit?memberid={{ memberid }}&contractid={{ contract.contractid }}"
+                  title="修改签约信息"
+                  title-class="edit-cell" />
+      </van-cell-group>
+    </block>
+
+    <neo-nodata :message="'没有签约信息'"
+                :show="!contractCount" />
+  </div>
+</template>
+
+<script>
+import wepy from '@wepy/core'
+import api from '@/api/index'
+
+wepy.page({
+  components: {},
+
+  props: {},
+
+  data: {
+    memberid: 0,
+    member: {},
+    contracts: {},
+    contractCount: 0
+  },
+
+  methods: {
+    getMember() {
+      if (this.memberid) {
+        this.member = wx.neoGetGD('member')
+        wx.setNavigationBarTitle({ title: this.member.membername + '的签约记录' })
+      }
+    },
+
+    getContracts() {
+      this.getMember()
+
+      api
+        .get('api/contract/index/' + this.memberid, {})
+        .then(res => {
+          this.contracts = res.data.contracts
+          wx.neoSetGD('contracts', this.contracts)
+
+          this.contractCount = Object.keys(this.contracts).length
+        })
+        .catch(error => {
+          console.error('getContracts', error)
+        })
+    },
+
+    onAddContract() {
+      wx.navigateTo({
+        url: `/pages/contracts/edit?memberid=${this.memberid}`
+      })
+    }
+  },
+
+  created() { },
+
+  onShow() {
+    // 编辑签约信息后返回
+    let gd = wx.neoGD()
+    if (gd.lastAction.contract) {
+      this.contracts = gd.contracts
+
+      delete gd.lastAction.contract
+
+      this.getContracts()
+    }
+  },
+
+  onLoad(options) {
+    this.memberid = parseInt(options.memberid)
+    if (isNaN(this.memberid)) {
+      this.memberid = 0
+    }
+    this.getContracts()
+  },
+
+  onPullDownRefresh() {
+    this.getContracts()
+
+    setTimeout(() => {
+      wx.stopPullDownRefresh()
+    }, 1000)
+  }
+})
+</script>
+
+<config>
+{
+    navigationBarTitleText: '客户签约记录',
+    enablePullDownRefresh: true,
+    usingComponents: {
+      'neo-nodata': '~@/components/neo/nodata',
+      'van-button': '~@/components/vant/button/index',
+      'van-cell': '~@/components/vant/cell/index',
+      'van-cell-group': '~@/components/vant/cell-group/index',
+      'van-icon': '~@/components/vant/icon/index'
+    }
+}
+</config>
+
+<style>
+</style>

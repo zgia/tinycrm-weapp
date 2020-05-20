@@ -1,0 +1,109 @@
+<template>
+  <div>
+    <van-popup show="{{ show }}"
+               position="bottom">
+      <van-picker show-toolbar
+                  title="{{ title }}"
+                  class="{{ key }}"
+                  columns="{{ columns }}"
+                  default-index="{{ defaultIndex }}"
+                  bind:confirm="onConfirm"
+                  bind:cancel="onClosePopup" />
+    </van-popup>
+  </div>
+</template>
+
+<script>
+import wepy from '@wepy/core'
+
+wepy.component({
+  props: {
+    show: {
+      type: Boolean,
+      default: false
+    },
+    title: {
+      type: String,
+      default: ''
+    },
+    key: {
+      type: String,
+      default: ''
+    },
+    keyid: {
+      type: Number,
+      default: 0
+    }
+  },
+
+  watch: {
+    show(newValue, oldValue) {
+      if (newValue) {
+        this.initPickerData()
+      }
+    }
+  },
+
+  data() {
+    return {
+      columns: [],
+      defaultIndex: 0,
+      idIndex: []
+    }
+  },
+
+  computed: {},
+
+  methods: {
+    initPickerData() {
+      let msList = this.$parent.$app.$options.globalData.memberStatusList[`${this.key}List`]
+
+      this.columns = []
+      this.idIndex = []
+
+      // 对象，键值是其对应的ID
+      for (let idx in msList) {
+        this.columns.push(msList[idx])
+        this.idIndex.push(parseInt(idx))
+      }
+
+      this.defaultIndex = this.idIndex.indexOf(this.keyid)
+    },
+
+    // 取消时，恢复到初始状态
+    onClosePopup() {
+      this.show = false
+      this.$wx.selectComponent(`.${this.key}`).setIndexes([this.defaultIndex])
+
+      // 同时更新父组件属性
+      this.$emit('update-parent-props', ['popup', this.key, false])
+    },
+
+    onConfirm(value) {
+      this.defaultIndex = value.$wx.detail.index
+
+      // 写回父组件
+      this.$emit('update-parent-props', ['id', this.key, this.idIndex[this.defaultIndex]])
+
+      this.onClosePopup()
+    }
+  },
+
+  created() { }
+})
+</script>
+
+<config>
+{
+    usingComponents: {
+      'van-popup': '~@/components/vant/popup/index',
+      'van-picker': '~@/components/vant/picker/index'
+    }
+}
+</config>
+
+<style>
+.upload-files {
+  padding-top: 20px;
+}
+</style>

@@ -1,0 +1,141 @@
+<template>
+  <div class="container">
+    <view>
+      <van-button type="primary"
+                  size="small"
+                  icon="add-o"
+                  bind:click="onAddFamily"
+                  block>添加亲属</van-button>
+    </view>
+
+    <block v-for="family in families"
+           :key="family.familyid">
+      <van-cell-group title="{{ family.membername }}">
+        <van-cell center
+                  title="姓名"
+                  value="{{ family.membername }}" />
+        <van-cell center
+                  title="与{{ member.membername }}的关系"
+                  value="{{ memberStatusList.relationshipList[family.relationship] }}" />
+        <van-cell center
+                  title="联系方式"
+                  value="{{ family.mobile }}" />
+        <van-cell center
+                  title="生日"
+                  value="{{ family.birthday }}" />
+        <van-cell center
+                  title="备注"
+                  value="{{ family.description }}" />
+        <van-cell center
+                  is-link
+                  link-type="navigateTo"
+                  url="/pages/family/edit?memberid={{ memberid }}&familyid={{ family.familyid }}"
+                  title="修改{{ family.membername }}的信息"
+                  title-class="edit-cell" />
+      </van-cell-group>
+    </block>
+
+    <neo-nodata :message="'没有亲属信息'"
+                :show="!familyCount" />
+  </div>
+</template>
+
+<script>
+import wepy from '@wepy/core'
+import api from '@/api/index'
+
+wepy.page({
+  components: {},
+
+  props: {},
+
+  data: {
+    memberid: 0,
+    member: {},
+    families: {},
+    familyCount: 0,
+    memberStatusList: {}
+  },
+
+  methods: {
+    getMember() {
+      if (this.memberid) {
+        this.member = wx.neoGetGD('member')
+        wx.setNavigationBarTitle({ title: this.member.membername + '的亲属' })
+      }
+    },
+
+    getFamily() {
+      this.getMember()
+
+      api
+        .get('api/member/family/' + this.memberid, {})
+        .then(res => {
+          this.families = res.data.families
+          wx.neoSetGD('families', this.families)
+
+          this.familyCount = Object.keys(this.families).length
+        })
+        .catch(error => {
+          console.error('getFamily', error)
+        })
+    },
+
+    onAddFamily() {
+      wx.navigateTo({
+        url: `/pages/family/edit?memberid=${this.memberid}`
+      })
+    }
+  },
+
+  created() {
+    this.memberStatusList = wx.neoGetGD('memberStatusList')
+  },
+
+  onShow() {
+    // 编辑亲属信息后返回
+    let gd = wx.neoGD()
+    if (gd.lastAction.family) {
+      this.families = gd.families
+
+      delete gd.lastAction.family
+
+      this.getFamily()
+    }
+  },
+
+  onLoad(options) {
+    this.memberid = parseInt(options.memberid)
+    if (isNaN(this.memberid)) {
+      this.memberid = 0
+    }
+
+    this.getFamily()
+  },
+
+  onPullDownRefresh() {
+    this.getFamily()
+
+    setTimeout(() => {
+      wx.stopPullDownRefresh()
+    }, 1000)
+  }
+})
+</script>
+
+<config>
+{
+    navigationBarTitleText: '客户亲属',
+    enablePullDownRefresh: true,
+    usingComponents: {
+      'neo-nodata': '~@/components/neo/nodata',
+      'van-button': '~@/components/vant/button/index',
+      'van-cell': '~@/components/vant/cell/index',
+      'van-cell-group': '~@/components/vant/cell-group/index',
+      'van-icon': '~@/components/vant/icon/index'
+    }
+}
+</config>
+
+<style>
+</style>

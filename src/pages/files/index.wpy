@@ -1,0 +1,183 @@
+<template>
+  <div class="container">
+    <view class="center-view">
+      <van-button type="primary"
+                  size="small"
+                  icon="add-o"
+                  custom-class="btn-margin-2"
+                  bind:click="onAddFile">添加文件资料</van-button>
+      <van-button type="primary"
+                  size="small"
+                  icon="add-o"
+                  custom-class="btn-margin-2"
+                  bind:click="onAddImage">添加图片资料</van-button>
+    </view>
+
+    <block v-for="(files_, day) in files"
+           v-key="{{day}}">
+      <text class="header-title">上传时间: {{ day }}，数量: {{ files_.length }}</text>
+      <van-grid column-num="4"
+                border="{{ false }}">
+        <van-grid-item use-slot
+                       wx:for="{{ files_ }}"
+                       wx:for-item="file"
+                       wx:key="index"
+                       data-id="{{ file.fileid }}"
+                       bind:click="onClickFile">
+          <van-image width="80px"
+                     height="80px"
+                     radius="4px"
+                     fit="cover"
+                     src="{{ file.url_thumbnail }}" />
+          <text class="description">{{ file.description }}</text>
+        </van-grid-item>
+      </van-grid>
+    </block>
+
+    <text v-if="fileCount"
+          style="text-align: center;padding: 16px 0;font-size: 16px;line-height: 16px;color: #000;font-weight: 700;">
+      {{ fileCount }} 项
+    </text>
+
+    <neo-nodata :message="'没有上传资料'"
+                :show="!fileCount" />
+  </div>
+</template>
+
+<script>
+import wepy from '@wepy/core'
+import api from '@/api/index'
+
+wepy.page({
+  components: {},
+
+  props: {},
+
+  data: {
+    memberid: 0,
+    member: {},
+    files: {},
+    fileCount: 0
+  },
+
+  methods: {
+    getMember() {
+      if (this.memberid) {
+        this.member = wx.neoGetGD('member')
+        wx.setNavigationBarTitle({ title: this.member.membername + '的资料' })
+      }
+    },
+
+    getFiles() {
+      this.getMember()
+
+      api
+        .get('api/file/index/' + this.memberid, {})
+        .then(res => {
+          this.files = res.data.files
+          wx.neoSetGD('files', this.files)
+
+          this.fileCount = 0
+          if (Object.keys(this.files).length) {
+            Object.keys(this.files).map(day_ => {
+              this.fileCount += this.files[day_].length
+            })
+          }
+        })
+        .catch(error => {
+          console.error('getFiles', error)
+        })
+    },
+
+    onAddFile() {
+      wx.navigateTo({
+        url: `/pages/files/edit?memberid=${this.memberid}&filetype=file`
+      })
+    },
+
+    onAddImage() {
+      wx.navigateTo({
+        url: `/pages/files/edit?memberid=${this.memberid}&filetype=image`
+      })
+    },
+
+    onClickFile(event) {
+      wx.navigateTo({
+        url: `/pages/files/view?memberid=${this.memberid}&fileid=${event.currentTarget.dataset.id}`
+      })
+    }
+  },
+
+  created() { },
+
+  onShow() {
+    let lastAction = wx.neoGetGD('lastAction')
+    if (lastAction.file) {
+      delete lastAction.family
+
+      this.getFiles()
+    }
+  },
+
+  onLoad(options) {
+    this.memberid = parseInt(options.memberid)
+    if (isNaN(this.memberid)) {
+      this.memberid = 0
+    }
+
+    // this.memberid = 22
+
+    this.getFiles()
+  },
+
+  onPullDownRefresh() {
+    this.getFiles()
+
+    setTimeout(() => {
+      wx.stopPullDownRefresh()
+    }, 1000)
+  }
+})
+</script>
+
+<config>
+{
+    navigationBarTitleText: '客户资料',
+    enablePullDownRefresh: true,
+    usingComponents: {
+      'neo-nodata': '~@/components/neo/nodata',
+      'van-panel': '~@/components/vant/panel/index',
+      'van-divider': '~@/components/vant/divider/index',
+      'van-image': '~@/components/vant/image/index',
+      'van-button': '~@/components/vant/button/index',
+      'van-cell': '~@/components/vant/cell/index',
+      'van-cell-group': '~@/components/vant/cell-group/index',
+      'van-grid': '~@/components/vant/grid/index',
+      'van-grid-item': '~@/components/vant/grid-item/index',
+      'van-icon': '~@/components/vant/icon/index'
+    }
+}
+</config>
+
+<style>
+.van-panel__content {
+  margin: 15px;
+  white-space: pre-wrap;
+}
+.footer-class {
+  /*text-align: right;*/
+  padding-left: 0 !important;
+}
+.ml5 {
+  margin-left: 5px;
+}
+.value-class {
+  white-space: pre-wrap;
+}
+.description {
+  word-wrap: break-word;
+  color: #646566;
+  font-size: 12px;
+  height: 40px;
+}
+</style>

@@ -1,0 +1,96 @@
+<template>
+  <div>
+    <van-popup show="{{ show }}"
+               position="bottom">
+      <van-datetime-picker type="date"
+                           title="{{ title }}"
+                           min-date="{{ minDate }}"
+                           value="{{ dateline }}"
+                           bind:confirm="onConfirm"
+                           bind:cancel="onClosePopup" />
+    </van-popup>
+  </div>
+</template>
+
+<script>
+import wepy from '@wepy/core'
+import utils from '@/utils/index'
+
+wepy.component({
+  props: {
+    show: {
+      type: Boolean,
+      default: false
+    },
+    title: {
+      type: String,
+      default: ''
+    },
+    key: {
+      type: String,
+      default: ''
+    },
+    date: {
+      type: String,
+      default: '-1'
+    }
+  },
+
+  watch: {
+    show(newValue, oldValue) {
+      console.log(`show: ${oldValue} -> ${newValue}`)
+    },
+    key(newValue, oldValue) {
+      console.log(`key: ${oldValue} -> ${newValue}`)
+    },
+    date(newValue, oldValue) {
+      console.log(`date: ${oldValue} -> ${newValue}`)
+      this.dateline = utils.getTimeWithMs(newValue)
+    }
+  },
+
+  data() {
+    return {
+      dateline: 0,
+      minDate: new Date(1949, 9, 1).getTime()
+    }
+  },
+
+  computed: {},
+
+  methods: {
+    onClosePopup() {
+      this.show = false
+
+      // 同时更新父组件属性
+      this.$emit('update-parent-props', ['popup', this.key, false])
+    },
+
+    onConfirm(value) {
+      this.dateline = value.$wx.detail
+
+      // 同时更新父组件属性
+      this.$emit('update-parent-props', ['data', this.key, utils.formatTime(new Date(this.dateline))])
+
+      this.onClosePopup()
+    }
+  },
+
+  created() { }
+})
+</script>
+
+<config>
+{
+    usingComponents: {
+      'van-popup': '~@/components/vant/popup/index',
+      'van-datetime-picker': '~@/components/vant/datetime-picker/index'
+    }
+}
+</config>
+
+<style>
+.upload-files {
+  padding-top: 20px;
+}
+</style>

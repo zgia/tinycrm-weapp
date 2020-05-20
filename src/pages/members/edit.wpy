@@ -1,0 +1,469 @@
+<template>
+  <div class="container">
+    <view>
+      <van-button type="primary"
+                  size="small"
+                  icon="upgrade"
+                  bind:click="onUpdateMember"
+                  block>保存客户信息</van-button>
+    </view>
+
+    <van-cell-group title="客户姓名">
+      <van-field value="{{ member.membername }}"
+                 required
+                 clearable
+                 label="姓名"
+                 placeholder="请输入客户姓名"
+                 id="membername"
+                 bind:input="onInputMemberInfo" />
+    </van-cell-group>
+
+    <van-cell-group title="客户状态">
+
+      <van-cell is-link
+                title="客户标签"
+                value="{{ tagTitle }}"
+                bind:click="onShowPopup('tag')" />
+      <van-popup show="{{ msPopup.tag }}"
+                 closeable
+                 bind:close="onClosePopup"
+                 position="bottom">
+        <van-checkbox-group value="{{ tags }}"
+                            bind:change="onChangeTags">
+          <van-cell-group title="客户标签">
+            <block v-for="(ttitle, tid) in memberStatusList.tagList"
+                   :key="tag{{ tid }}">
+              <van-cell title="{{ ttitle }}"
+                        value-class="value-class"
+                        clickable
+                        data-index="tag{{ tid }}"
+                        bind:click="{{ onToggleTag(tid) }}">
+                <view class="van-cell-value">
+                  <van-checkbox catch:tap="noopTag"
+                                class="tag{{ tid }}"
+                                name="tag{{ tid }}" />
+                </view>
+              </van-cell>
+            </block>
+          </van-cell-group>
+        </van-checkbox-group>
+      </van-popup>
+
+      <van-cell is-link
+                title="签约状态"
+                value="{{ msTitle.signed }}"
+                bind:click="onShowPopup('signed')" />
+
+      <van-cell is-link
+                title="销售状态"
+                value="{{ msTitle.saler }}"
+                bind:click="onShowPopup('saler')" />
+    </van-cell-group>
+
+    <van-cell-group title="基本信息">
+      <van-cell is-link
+                title="生日"
+                value="{{ birthday }}"
+                bind:click="onShowPopup('birthday')" />
+
+      <van-cell is-link
+                title="性别"
+                value="{{ msTitle.gender }}"
+                bind:click="onShowPopup('gender')" />
+
+      <van-cell is-link
+                title="婚姻状况"
+                value="{{ msTitle.marital }}"
+                bind:click="onShowPopup('marital')" />
+
+      <van-field value="{{ member.idcard }}"
+                 clearable
+                 label="身份证"
+                 placeholder="110101xxxxxxxxxx"
+                 id="idcard"
+                 bind:input="onInputMemberInfo" />
+      <van-field value="{{ member.mobile }}"
+                 clearable
+                 label="联系方式"
+                 placeholder="比如：1390xxxxxxx"
+                 id="mobile"
+                 bind:input="onInputMemberInfo" />
+      <van-field value="{{ member.tel }}"
+                 clearable
+                 label="联系方式"
+                 placeholder="比如：34576545"
+                 id="tel"
+                 bind:input="onInputMemberInfo" />
+      <van-field value="{{ member.annual_income }}"
+                 clearable
+                 label="年收入(万元)"
+                 placeholder="比如：40"
+                 id="annual_income"
+                 bind:input="onInputMemberInfo" />
+      <van-field value="{{ member.financing_habit }}"
+                 clearable
+                 label="理财习惯"
+                 placeholder="比如：冒进"
+                 id="financing_habit"
+                 bind:input="onInputMemberInfo" />
+      <van-field value="{{ member.personality }}"
+                 clearable
+                 label="性格"
+                 placeholder="比如：乐观"
+                 id="personality"
+                 bind:input="onInputMemberInfo" />
+      <van-field value="{{ member.hobby }}"
+                 clearable
+                 label="兴趣爱好"
+                 placeholder="比如：篮球"
+                 id="hobby"
+                 bind:input="onInputMemberInfo" />
+      <van-field value="{{ member.home_address }}"
+                 clearable
+                 label="家庭地址"
+                 placeholder="请输入家庭地址"
+                 id="home_address"
+                 bind:input="onInputMemberInfo" />
+      <van-field value="{{ member.home_address_postcode }}"
+                 clearable
+                 label="邮编"
+                 placeholder="家庭地址邮政编码"
+                 id="home_address_postcode"
+                 bind:input="onInputMemberInfo" />
+    </van-cell-group>
+
+    <van-cell-group title="公司信息">
+      <van-field value="{{ member.company }}"
+                 clearable
+                 label="公司"
+                 placeholder="请输入公司名称"
+                 id="company"
+                 bind:input="onInputMemberInfo" />
+      <van-field value="{{ member.company_title }}"
+                 clearable
+                 label="职位"
+                 placeholder="比如：xx总监"
+                 id="company_title"
+                 bind:input="onInputMemberInfo" />
+      <van-field value="{{ member.company_address }}"
+                 clearable
+                 label="公司地址"
+                 placeholder="请输入公司地址"
+                 id="company_address"
+                 bind:input="onInputMemberInfo" />
+      <van-field value="{{ member.company_address_postcode }}"
+                 clearable
+                 label="邮编"
+                 placeholder="公司地址邮政编码"
+                 id="company_address_postcode"
+                 bind:input="onInputMemberInfo" />
+    </van-cell-group>
+
+    <van-cell-group title="其他信息">
+      <van-field value="{{ member.description }}"
+                 type="textarea"
+                 autosize
+                 clearable
+                 label="备注"
+                 placeholder="请输入其他补充信息"
+                 id="description"
+                 bind:input="onInputMemberInfo" />
+    </van-cell-group>
+
+    <view>
+      <van-button type="primary"
+                  size="small"
+                  icon="upgrade"
+                  bind:click="onUpdateMember"
+                  block>保存客户信息</van-button>
+    </view>
+
+    <van-toast id="van-toast" />
+    <van-notify id="van-notify" />
+
+    <view>
+      <block v-for="(name, key) in msKeys">
+        <neo-popup-picker key="{{ key }}"
+                          title="{{ name }}"
+                          @update-parent-props="updateParentProps($event)"
+                          :show="msPopup[key]"
+                          :keyid="member[key]" />
+      </block>
+
+      <neo-popup-datetime key="birthday"
+                          title="生日"
+                          @update-parent-props="updateParentProps($event)"
+                          :show="msPopup.birthday"
+                          :date="birthday" />
+    </view>
+
+  </div>
+</template>
+
+<script>
+import wepy from '@wepy/core'
+import api from '@/api/index'
+import Toast from '@/components/vant/toast/toast'
+
+wepy.page({
+  components: {},
+
+  props: {},
+
+  data: {
+    memberid: 0,
+    member: {},
+    families: '',
+    memberData: {},
+    memberStatusList: {},
+
+    // 当前操作对象
+    currentKey: '',
+
+    tagTitle: '',
+    tags: [],
+
+    birthday: '',
+
+    msPopup: {
+      tag: false,
+      birthday: false
+    },
+
+    // 几个逻辑一致的单选项
+    msKeys: {
+      gender: '性别',
+      marital: '婚姻状况',
+      signed: '签约状态',
+      saler: '销售状态'
+    },
+    // 用于显示关系名称
+    msTitle: {},
+    // 对应的ID
+    msId: {}
+  },
+
+  watch: {
+    birthday(newValue, oldValue) {
+      console.log(`birthday: ${oldValue} -> ${newValue}`)
+    }
+  },
+
+  computed: {
+  },
+
+  methods: {
+    initMemberStatusData() {
+      for (let k in this.msKeys) {
+        this.$set(this.msTitle, k, '')
+        this.$set(this.msId, k, 0)
+        this.$set(this.msPopup, k, false)
+      }
+    },
+
+    getMember() {
+      let data = {}
+      let url = 'api/member/view/' + this.memberid
+      api
+        .get(url, data)
+        .then(res => {
+          this.memberData = res.data
+          this.member = this.memberData.member
+
+          // 在tag id前添加字符串'tag'，给checkbox的name使用
+          this.member.tags.map(tagid => {
+            this.tags.push('tag' + tagid)
+          })
+          this.tagTitle = this.makeTagTitles(this.member.tags)
+
+          this.birthday = this.member.birthday
+
+          for (let k in this.msKeys) {
+            this.msId[k] = parseInt(this.member[k])
+            this.msTitle[k] = this.memberStatusList[`${k}List`][this.msId[k]]
+          }
+        })
+        .catch(error => {
+          console.error(`edit.getMember: ${this.memberid}`, error)
+        })
+    },
+
+    onUpdateMember() {
+      if (wx.neoClickMore()) {
+        return
+      }
+
+      let member = this.member
+
+      member.birthday = this.birthday
+      member.tags = this.removeTagFromTags(this.tags)
+
+      for (let idx in this.msKeys) {
+        member[idx] = this.msId[idx]
+      }
+
+      let data = { member: member, memberid: this.memberid }
+
+      api
+        .post('api/member/update', data)
+        .then(res => {
+          if (res.code === 0) {
+            Toast({
+              type: 'success',
+              message: res.msg,
+              onClose: () => {
+                member.memberid = res.data.memberid
+                this.afterMemberUpdated(member)
+              }
+            })
+          } else {
+            Toast.fail(res.msg)
+          }
+        })
+        .catch(error => {
+          console.error(`onUpdateMember: ${this.memberid}`, error)
+          Toast.fail('更新客户失败')
+        })
+    },
+
+    afterMemberUpdated(member) {
+      // 新增客户
+      if (this.memberid === 0) {
+        wx.redirectTo({
+          url: `/pages/members/view?memberid=${member.memberid}`
+        })
+      } else {
+        wx.neoSetGD('member', member)
+
+        let lastAction = wx.neoGetGD('lastAction')
+        lastAction.member = member.memberid
+
+        wx.navigateBack()
+      }
+    },
+
+    makeTagTitles(tagids) {
+      let titles = []
+      tagids.map(tagid => {
+        titles.push(this.memberStatusList.tagList[tagid])
+      })
+      return titles.join(', ')
+    },
+
+    removeTagFromTags() {
+      let tagids = []
+      this.tags.map(tag => {
+        tagids.push(tag.substr('tag'.length))
+      })
+
+      return tagids
+    },
+
+    // Tag
+    onChangeTags(event) {
+      this.tags = event.$wx.detail
+      this.tagTitle = this.makeTagTitles(this.removeTagFromTags(this.tags))
+    },
+
+    onToggleTag(index) {
+      const checkbox = this.$wx.selectComponent(`.tag${index}`)
+      checkbox.toggle()
+    },
+
+    noopTag(event) {
+    },
+
+    onShowPopup(key) {
+      this.currentKey = key
+      this.msPopup[key] = true
+    },
+
+    onClosePopup() {
+      this.msPopup[this.currentKey] = false
+    },
+
+    // 修改客户信息
+    onInputMemberInfo(event) {
+      this.member[event.$wx.currentTarget.id] = event.$wx.detail
+    },
+
+    updateParentProps(event) {
+      console.log('event', event)
+      // ["data", "birthday", "2000-01-01"]
+      // ["popup", "birthday", false]
+
+      switch (event[0]) {
+        case 'id':
+          this.msId[event[1]] = event[2]
+          this.msTitle[event[1]] = this.memberStatusList[`${event[1]}List`][event[2]]
+          break
+        case 'popup':
+          this.msPopup[event[1]] = event[2]
+          break
+        case 'data':
+          this[event[1]] = event[2]
+          break
+      }
+    }
+  },
+
+  created() {
+    console.log('created')
+
+    this.initMemberStatusData()
+
+    this.memberStatusList = wx.neoGetGD('memberStatusList')
+  },
+
+  onReady() {
+    console.log('onReady')
+  },
+
+  onShow() {
+    console.log('onShow')
+  },
+
+  onHide() {
+    console.log('onHide')
+  },
+
+  onLoad(options) {
+    console.log('onLoad')
+
+    this.memberid = parseInt(options.memberid)
+    if (isNaN(this.memberid)) {
+      this.memberid = 0
+    }
+
+    this.getMember()
+  }
+})
+</script>
+
+<config>
+{
+    navigationBarTitleText: '客户信息',
+    usingComponents: {
+      'neo-popup-datetime': '~@/components/neo/popup-datetime',
+      'neo-popup-picker': '~@/components/neo/popup-picker',
+      'van-toast': '~@/components/vant/toast/index',
+      'van-notify': '~@/components/vant/notify/index',
+      'van-button': '~@/components/vant/button/index',
+      'van-cell': '~@/components/vant/cell/index',
+      'van-cell-group': '~@/components/vant/cell-group/index',
+      'van-icon': '~@/components/vant/icon/index',
+      'van-checkbox': '~@/components/vant/checkbox/index',
+      'van-checkbox-group': '~@/components/vant/checkbox-group/index',
+      'van-field': '~@/components/vant/field/index',
+      'van-switch': '~@/components/vant/switch/index',
+      'van-popup': '~@/components/vant/popup/index',
+      'van-picker': '~@/components/vant/picker/index'
+    }
+}
+</config>
+
+<style>
+.value-class {
+  flex: none !important;
+}
+</style>

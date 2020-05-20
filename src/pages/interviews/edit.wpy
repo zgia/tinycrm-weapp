@@ -1,0 +1,246 @@
+<template>
+  <div class="container">
+    <view>
+      <van-button type="primary"
+                  size="small"
+                  icon="upgrade"
+                  bind:click="onUpdateInterview"
+                  block>保存客户访谈记录</van-button>
+    </view>
+
+    <van-cell-group title="    ">
+
+      <van-cell is-link
+                title="访谈时间"
+                value="{{ interviewday }}"
+                bind:click="onShowPopup('interviewday')" />
+
+      <van-field value="{{ interview.address }}"
+                 clearable
+                 label="访谈地点"
+                 placeholder="比如：东方银座星巴克"
+                 id="address"
+                 bind:input="onInputInterviewInfo" />
+      <van-field value="{{ interview.content }}"
+                 type="textarea"
+                 autosize
+                 placeholder="请输入访谈内容"
+                 id="content"
+                 bind:input="onInputInterviewInfo" />
+
+    </van-cell-group>
+
+    <neo-uploader :memberid="memberid"
+                  :fileType="fileType"
+                  :fileList="fileList"
+                  :fileCoverList="fileCoverList" />
+
+    <neo-popup-datetime key="interviewday"
+                        title="访谈日期"
+                        @update-parent-props="updateParentProps($event)"
+                        :show="msPopup.interviewday"
+                        :date="interviewday" />
+
+    <van-toast id="van-toast" />
+    <van-notify id="van-notify" />
+    <van-dialog id="van-dialog" />
+  </div>
+</template>
+
+<script>
+import wepy from '@wepy/core'
+import api from '@/api/index'
+import Toast from '@/components/vant/toast/toast'
+wepy.page({
+  components: {},
+
+  props: {},
+
+  data: {
+    fileType: 'image',
+
+    memberid: 0,
+    interviewid: 0,
+    interview: {},
+    idx: 0,
+
+    // 原来文件
+    fileList: [],
+    fileCoverList: [],
+    // 添加文件
+    newFileList: [],
+    // 删除文件
+    deletedFileList: [],
+
+    // 当前操作对象
+    msPopup: {
+      interviewday: false
+    },
+    interviewday: ''
+  },
+
+  computed: {
+  },
+
+  methods: {
+    getMember() {
+      if (this.memberid) {
+        this.member = wx.neoGetGD('member')
+        wx.setNavigationBarTitle({ title: this.member.membername + '的访谈记录' })
+      }
+    },
+
+    getInterview() {
+      this.getMember()
+
+      if (this.interviewid !== 0) {
+        let _interviews = wx.neoGetGD('interviews')
+        this.interview = _interviews[this.idx]
+
+        if (!this.interview || this.interview.interviewid !== this.interviewid) {
+          _interviews.map((_interview, idx) => {
+            if (_interview.interviewid === this.interviewid) {
+              this.interview = _interview
+              this.idx = idx
+            }
+          })
+        }
+
+        console.log(this.interviewid, this.idx, this.interview)
+      } else {
+        this.interview = { files: [], interviewday: null }
+      }
+
+      this.interviewday = this.interview.interviewday
+
+      if (this.interview.files.thumbnail && this.interview.files.thumbnail.length) {
+        this.interview.files.thumbnail.map(url => {
+          this.fileCoverList.push({ url: url })
+        })
+      }
+      if (this.interview.files.url && this.interview.files.url.length) {
+        this.interview.files.url.map(url => {
+          this.fileList.push({ url: url })
+        })
+      }
+    },
+
+    onUpdateInterview() {
+      if (wx.neoClickMore()) {
+        return
+      }
+
+      let interview = this.interview
+
+      interview.memberid = this.memberid
+      interview.interviewid = this.interviewid
+      interview.interviewday = this.interviewday
+
+      let data = {
+        interview: interview,
+        new_files: this.newFileList,
+        deleted_files: this.deletedFileList
+      }
+
+      api
+        .post(`api/interview/update`, data)
+        .then(res => {
+          if (res.code === 0) {
+            Toast({
+              type: 'success',
+              message: res.msg,
+              onClose: () => {
+                interview.interviewid = res.data.interviewid
+                this.afterInterviewUpdated(interview)
+              }
+            })
+          } else {
+            Toast.fail(res.msg)
+          }
+        })
+        .catch(error => {
+          const err = `onUpdateInterview: ${this.memberid}-${this.interviewid}, ${error}`
+          Toast.fail(err)
+        })
+    },
+
+    afterInterviewUpdated(interview) {
+      let gd = wx.neoGD()
+      gd.families[interview.interviewid] = interview
+
+      gd.lastAction.interview = interview.interviewid
+
+      wx.navigateBack()
+    },
+
+    // 修改客户信息
+    onInputInterviewInfo(event) {
+      this.interview[event.$wx.currentTarget.id] = event.$wx.detail
+    },
+
+    onShowPopup(key) {
+      this.msPopup[key] = true
+    },
+
+    updateParentProps(event) {
+      console.log('event', event)
+      // ["data", "interview", "2000-01-01"]
+      // ["popup", "interview", false]
+
+      switch (event[0]) {
+        case 'popup':
+          this.msPopup[event[1]] = event[2]
+          break
+        case 'data':
+          this[event[1]] = event[2]
+          break
+      }
+    }
+  },
+
+  created() { },
+
+  onLoad(options) {
+    this.memberid = parseInt(options.memberid)
+    if (isNaN(this.memberid)) {
+      this.memberid = 0
+    }
+
+    this.interviewid = parseInt(options.interviewid)
+    if (isNaN(this.interviewid)) {
+      this.interviewid = 0
+    }
+
+    this.idx = parseInt(options.idx)
+    if (isNaN(this.idx)) {
+      this.idx = 0
+    }
+
+    this.getInterview()
+  }
+})
+</script>
+
+<config>
+{
+    navigationBarTitleText: '客户访谈记录',
+    usingComponents: {
+      'neo-popup-datetime': '~@/components/neo/popup-datetime',
+      'neo-uploader': '~@/components/neo/uploader',
+      'van-dialog': '~@/components/vant/dialog/index',
+      'van-toast': '~@/components/vant/toast/index',
+      'van-notify': '~@/components/vant/notify/index',
+      'van-button': '~@/components/vant/button/index',
+      'van-cell': '~@/components/vant/cell/index',
+      'van-cell-group': '~@/components/vant/cell-group/index',
+      'van-icon': '~@/components/vant/icon/index',
+      'van-field': '~@/components/vant/field/index'
+    }
+}
+</config>
+
+<style>
+.upload-files {
+  padding-top: 20px;
+}
+</style>

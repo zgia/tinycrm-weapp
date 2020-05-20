@@ -1,0 +1,130 @@
+<template>
+  <div class="container">
+    <view>
+      <van-button type="primary"
+                  size="small"
+                  icon="upgrade"
+                  bind:click="onUpdateFile"
+                  block>保存客户资料</van-button>
+    </view>
+
+    <van-cell-group title="    ">
+      <van-field clearable
+                 label="备注"
+                 placeholder="比如：签约相关文档"
+                 bind:input="onInputFileInfo" />
+    </van-cell-group>
+
+    <neo-uploader :memberid="memberid"
+                  :fileType="fileType" />
+
+    <van-toast id="van-toast" />
+    <van-notify id="van-notify" />
+    <van-dialog id="van-dialog" />
+  </div>
+</template>
+
+<script>
+import wepy from '@wepy/core'
+import api from '@/api/index'
+import Toast from '@/components/vant/toast/toast'
+
+wepy.page({
+  components: {},
+
+  props: {},
+
+  data: {
+    fileType: 'image',
+
+    memberid: 0,
+    member: {},
+    description: '',
+
+    // 添加文件
+    newFileList: [],
+    // 删除文件
+    deletedFileList: []
+  },
+
+  methods: {
+    onUpdateFile() {
+      if (wx.neoClickMore()) {
+        return
+      }
+
+      let data = {
+        memberid: this.memberid,
+        description: this.description,
+        new_files: this.newFileList,
+        deleted_files: this.deletedFileList
+      }
+
+      api
+        .post(`api/file/update`, data)
+        .then(res => {
+          if (res.code === 0) {
+            Toast(res.msg)
+            this.afterFileUpdated()
+          } else {
+            Toast.fail(res.msg)
+          }
+        })
+        .catch(error => {
+          Toast.fail(`onUpdateFile: ${this.memberid}-${this.fileid}`, error)
+        })
+    },
+
+    afterFileUpdated(file) {
+      let lastAction = wx.neoGetGD('lastAction')
+      lastAction['file'] = 'newfiles'
+
+      wx.navigateBack()
+    },
+
+    // 文件备注
+    onInputFileInfo(event) {
+      this.description = event.$wx.detail
+    }
+  },
+
+  created() { },
+
+  onLoad(options) {
+    this.memberid = parseInt(options.memberid)
+    if (isNaN(this.memberid)) {
+      this.memberid = 0
+    }
+
+    this.fileType = options.filetype
+    if (this.fileType !== 'file' && this.fileType !== 'image') {
+      this.fileType = 'image'
+    }
+
+    console.log('$children', this.$children)
+  }
+})
+</script>
+
+<config>
+{
+    navigationBarTitleText: '编辑客户资料',
+    usingComponents: {
+      'neo-uploader': '~@/components/neo/uploader',
+      'van-toast': '~@/components/vant/toast/index',
+      'van-notify': '~@/components/vant/notify/index',
+      'van-dialog': '~@/components/vant/dialog/index',
+      'van-button': '~@/components/vant/button/index',
+      'van-cell': '~@/components/vant/cell/index',
+      'van-cell-group': '~@/components/vant/cell-group/index',
+      'van-icon': '~@/components/vant/icon/index',
+      'van-field': '~@/components/vant/field/index'
+    }
+}
+</config>
+
+<style>
+.upload-files {
+  padding-top: 20px;
+}
+</style>

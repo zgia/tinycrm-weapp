@@ -1,0 +1,27 @@
+<template>
+  <view v-if="show" style="padding-top: 150px;display: flex;align-items: center;justify-content: center;">
+    <view style="text-align: center;font-size: 16px;color: #1989fa;">
+      <icon type="info"
+            size="30"
+            color="#1989fa" />
+      <view style="padding-top:10px;">{{ message }}</view>
+    </view>
+  </view>
+</template>
+
+<script>
+import wepy from '@wepy/core'
+
+wepy.component({
+  props: {
+    message: {
+      type: String,
+      default: '没有数据'
+    },
+    show: {
+      type: Boolean,
+      default: false
+    }
+  }
+})
+</script>

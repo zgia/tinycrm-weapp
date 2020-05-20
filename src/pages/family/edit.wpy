@@ -1,0 +1,236 @@
+<template>
+  <div class="container">
+    <view>
+      <van-button type="primary"
+                  size="small"
+                  icon="upgrade"
+                  bind:click="onUpdateFamily"
+                  block>保存客户亲属信息</van-button>
+    </view>
+
+    <van-cell-group title="亲属信息">
+      <van-field value="{{ family.membername }}"
+                 clearable
+                 label="姓名"
+                 placeholder="请输入亲属姓名"
+                 id="membername"
+                 bind:input="onInputFamilyInfo" />
+
+      <van-cell is-link
+                title="关系"
+                value="{{ msTitle.relationship }}"
+                bind:click="onShowPopup('relationship')" />
+
+      <neo-popup-picker key="relationship"
+                        @update-parent-props="updateParentProps($event)"
+                        :show="msPopup.relationship"
+                        :keyid="msId.relationship" />
+
+      <van-field value="{{ family.mobile }}"
+                 clearable
+                 label="联系方式"
+                 placeholder="比如：1390xxxxxxx"
+                 id="mobile"
+                 bind:input="onInputFamilyInfo" />
+
+      <van-cell is-link
+                title="生日"
+                value="{{ birthday }}"
+                bind:click="onShowPopup('birthday')" />
+      <neo-popup-datetime key="birthday"
+                          title="生日"
+                          @update-parent-props="updateParentProps($event)"
+                          :show="msPopup.birthday"
+                          :date="birthday" />
+
+      <van-field value="{{ family.description }}"
+                 type="textarea"
+                 autosize
+                 clearable
+                 label="备注"
+                 placeholder="请输入其他补充信息"
+                 id="description"
+                 bind:input="onInputFamilyInfo" />
+    </van-cell-group>
+
+    <van-toast id="van-toast" />
+    <van-notify id="van-notify" />
+  </div>
+</template>
+
+<script>
+import wepy from '@wepy/core'
+import api from '@/api/index'
+import Toast from '@/components/vant/toast/toast'
+
+wepy.page({
+  components: {},
+
+  props: {},
+
+  data: {
+    memberid: 0,
+    familyid: 0,
+    family: {},
+    memberStatusList: {},
+
+    // 当前操作对象
+    currentKey: '',
+
+    // 生日
+    birthday: '',
+
+    // 弹窗
+    msPopup: {
+      birthday: false,
+      relationship: false
+    },
+    // 用于显示关系名称
+    msTitle: {
+      relationship: ''
+    },
+    // 对应的ID
+    msId: {
+      relationship: 0
+    }
+  },
+
+  computed: {},
+
+  methods: {
+    getMember() {
+      if (this.memberid) {
+        this.member = wx.neoGetGD('member')
+        wx.setNavigationBarTitle({ title: this.member.membername + '的亲属' })
+      }
+    },
+
+    getFamily() {
+      this.getMember()
+
+      if (this.familyid !== 0) {
+        let _families = wx.neoGetGD('families')
+        this.family = _families[this.familyid]
+        this.birthday = this.family.birthday
+      } else {
+        this.family = { relationship: 0 }
+        this.birthday = null
+      }
+
+      // 亲属名称
+      this.msId.relationship = this.family.relationship
+      this.msTitle.relationship = this.memberStatusList.relationshipList[this.family.relationship]
+    },
+
+    onUpdateFamily() {
+      if (wx.neoClickMore()) {
+        return
+      }
+
+      let family = this.family
+
+      family.memberid = this.memberid
+      family.familyid = this.familyid
+      family.birthday = this.birthday
+      family.relationship = this.msId.relationship
+
+      let data = { family: family }
+
+      api
+        .post(`api/member/updatefamily`, data)
+        .then(res => {
+          if (res.code === 0) {
+            Toast({
+              type: 'success',
+              message: res.msg,
+              onClose: () => {
+                family.familyid = res.data.familyid
+                this.afterFamilyUpdated(family)
+              }
+            })
+          } else {
+            Toast.fail(res.msg)
+          }
+        })
+        .catch(error => {
+          const err = `onUpdateFamily: ${this.memberid}-${this.familyid}, ${error}`
+          Toast.fail(err)
+        })
+    },
+
+    afterFamilyUpdated(family) {
+      let gd = wx.neoGD()
+      gd.families[family.familyid] = family
+
+      gd.lastAction.family = family.familyid
+
+      wx.navigateBack()
+    },
+
+    onShowPopup(key) {
+      this.currentKey = key
+      this.msPopup[key] = true
+    },
+
+    updateParentProps(event) {
+      console.log('event', event)
+
+      switch (event[0]) {
+        case 'id':
+          this.msId[event[1]] = event[2]
+          this.msTitle[event[1]] = this.memberStatusList[`${event[1]}List`][event[2]]
+          break
+        case 'popup':
+          this.msPopup[event[1]] = event[2]
+          break
+        case 'data':
+          this[event[1]] = event[2]
+          break
+      }
+    },
+
+    // 修改亲属信息
+    onInputFamilyInfo(event) {
+      this.family[event.$wx.currentTarget.id] = event.$wx.detail
+    }
+  },
+
+  created() {
+    this.memberStatusList = wx.neoGetGD('memberStatusList')
+  },
+
+  onLoad(options) {
+    this.memberid = parseInt(options.memberid)
+    if (isNaN(this.memberid)) {
+      this.memberid = 0
+    }
+
+    this.familyid = parseInt(options.familyid)
+    if (isNaN(this.familyid)) {
+      this.familyid = 0
+    }
+
+    this.getFamily()
+  }
+})
+</script>
+
+<config>
+{
+    navigationBarTitleText: '客户亲属',
+    usingComponents: {
+      'neo-popup-picker': '~@/components/neo/popup-picker',
+      'neo-popup-datetime': '~@/components/neo/popup-datetime',
+      'van-toast': '~@/components/vant/toast/index',
+      'van-notify': '~@/components/vant/notify/index',
+      'van-button': '~@/components/vant/button/index',
+      'van-cell': '~@/components/vant/cell/index',
+      'van-cell-group': '~@/components/vant/cell-group/index',
+      'van-icon': '~@/components/vant/icon/index',
+      'van-field': '~@/components/vant/field/index'
+    }
+}
+</config>
+
+<style>
+</style>

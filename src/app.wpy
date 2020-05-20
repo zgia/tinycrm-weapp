@@ -1,0 +1,249 @@
+<style lang="less">
+.container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  // align-items: center;
+  justify-content: space-between;
+  box-sizing: border-box;
+}
+.center-view {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+.edit-cell {
+  color: dodgerblue;
+}
+.van-cell__value {
+  color: #707070 !important;
+}
+.btn-margin-2 {
+  margin-left: 2px;
+  margin-right: 2px;
+}
+.header-title {
+  padding: 16px 16px 8px;
+  font-size: 14px;
+  line-height: 16px;
+  color: #969799;
+}
+</style>
+
+<script>
+import wepy from '@wepy/core'
+import eventHub from './common/eventHub'
+import vuex from '@wepy/x'
+import api from '@/api/index'
+import cfg from '@/api/config'
+import Notify from '@/components/vant/notify/notify'
+
+// 少些几个字符，哈哈
+wx.neoToast = (title) => {
+  wx.showToast({ title: title, icon: 'none' })
+}
+
+wepy.use(vuex)
+
+wepy.app({
+  hooks: {
+    // App 级别 hook，对整个 App 生效
+    // 同时存在 Page hook 和 App hook 时，优先执行 Page hook，返回值再交由 App hook 处
+    'before-setData': function (dirty) {
+      console.log('setData dirty: ', dirty)
+      return dirty
+    }
+  },
+
+  globalData: {
+    userInfo: null,
+    member: {},
+    families: {},
+    files: {},
+    fileImageType: 'gif|jpe?g|png',
+    fileAllowType: 'gif|jpe?g|png|pdf|xlsx?|docx?|pptx?',
+    fileMaxSize: 10485760,
+    memberStatusList: null,
+    lastAction: {},
+    searchQuery: null,
+    canBgFetchData: true,
+    updateBtnClicked: false
+  },
+
+  onLaunch() {
+    wx.neoGD = () => {
+      return this.$options.globalData
+    }
+    wx.neoGetGD = (key) => {
+      return this.$options.globalData[key]
+    }
+    wx.neoSetGD = (key, value) => {
+      this.$options.globalData[key] = value
+    }
+
+    // 连续点击按钮时，提示
+    wx.neoClickMore = () => {
+      if (wx.neoGetGD('updateBtnClicked')) {
+        wx.neoToast('请勿重复点击')
+
+        return true
+      } else {
+        Notify({ type: 'primary', message: '正在保存内容，请稍候...', duration: 2000 })
+
+        wx.neoSetGD('updateBtnClicked', true)
+        setTimeout(() => {
+          wx.neoSetGD('updateBtnClicked', false)
+        }, 3000)
+
+        return false
+      }
+    }
+
+    if (wx.neoGetGD('canBgFetchData')) {
+      wx.setBackgroundFetchToken({
+        token: 'Iwh93bDgw8d0*b5.Z',
+        complete: res => { console.info('setBackgroundFetchToken', res) }
+      })
+
+      // 数据预拉取
+      // https://developers.weixin.qq.com/miniprogram/dev/framework/ability/pre-fetch.html
+      wx.getBackgroundFetchData({
+        fetchType: 'pre',
+        success: res => {
+          const preData = JSON.parse(res.fetchedData)
+          console.log('getBackgroundFetchData', preData)
+
+          this.setGlobalData(preData.data)
+        },
+        fail: error => {
+          console.error('getBackgroundFetchData', error)
+        }
+      })
+    }
+
+    this.auth()
+
+    if (!wx.neoGetGD('canBgFetchData') || !wx.neoGetGD('memberStatusList')) {
+      this.getBaseData()
+    }
+
+    eventHub.$on('app-launch', (...args) => {
+      console.log('app-launch event emitted, the params are:')
+      console.log(args)
+    })
+  },
+
+  methods: {
+
+    setGlobalData(data) {
+      wx.neoSetGD('memberStatusList', data.statuslist)
+      wx.neoSetGD('fileImageType', data.config.file_image_type)
+      wx.neoSetGD('fileAllowType', data.config.file_allow_type)
+      wx.neoSetGD('fileMaxSize', data.config.file_max_size)
+    },
+
+    getBaseData() {
+      api
+        .get('api/bgfetchdata')
+        .then(res => {
+          this.setGlobalData(res.data)
+        })
+        .catch(error => {
+          console.error('bgfetchdata', error)
+        })
+    },
+
+    auth() {
+      api
+        .get('api/auth')
+        .then(res => {
+          console.log('auth', res)
+
+          if (res) {
+            if (res.code === 0) {
+              this.setToken(res.data)
+            } else {
+              this.unsetToken()
+            }
+          }
+        })
+        .catch(error => {
+          console.error('auth', error)
+        })
+    },
+
+    setToken(data) {
+      if (data && data.renew && cfg.isTokenStr(data.token)) {
+        wx.setStorage({
+          key: 'token',
+          data: data.token,
+          success: () => {
+            cfg.setToken(data.token)
+
+            console.log('auth', '成功更新Token')
+          }
+        })
+      }
+    },
+
+    unsetToken() {
+      console.log('auth', '移除Token')
+      wx.removeStorageSync('token')
+      wx.removeStorageSync('username')
+    }
+  }
+})
+</script>
+<config>
+{
+    pages: [
+      'pages/index',
+      'pages/members/index',
+      'pages/me/index',
+      'pages/members/view',
+      'pages/members/edit',
+      'pages/contracts/index',
+      'pages/contracts/edit',
+      'pages/family/index',
+      'pages/family/edit',
+      'pages/files/index',
+      'pages/files/view',
+      'pages/files/edit',
+      'pages/interviews/index',
+      'pages/interviews/edit'
+    ],
+    window: {
+      backgroundTextStyle: 'light',
+      navigationBarBackgroundColor: '#fff',
+      navigationBarTitleText: 'WeChat',
+      navigationBarTextStyle: 'black'
+    },
+    tabBar: {
+        color: '#B2B2B2',
+        selectedColor: '#409EFF',
+        borderStyle: 'black',
+        // backgroundColor: 'white',
+        list: [
+          {
+            pagePath: 'pages/index',
+            text: '首页',
+            iconPath: 'static/tabs/home.png',
+            selectedIconPath: 'static/tabs/home-active.png'
+          },
+          {
+            pagePath: 'pages/members/index',
+            text: '客户',
+            iconPath: 'static/tabs/members.png',
+            selectedIconPath: 'static/tabs/members-active.png'
+          },
+          {
+            pagePath: 'pages/me/index',
+            text: '我',
+            iconPath: 'static/tabs/me.png',
+            selectedIconPath: 'static/tabs/me-active.png'
+          }
+        ]
+    }
+}
+</config>
